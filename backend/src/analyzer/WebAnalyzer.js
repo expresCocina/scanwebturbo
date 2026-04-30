@@ -63,7 +63,10 @@ class WebAnalyzer {
     console.log('Analizando Performance...');
 
     try {
-      const chrome = await chromeLauncher.launch({ chromeFlags: ['--headless'] });
+      const chrome = await chromeLauncher.launch({
+        chromePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+        chromeFlags: ['--headless', '--no-sandbox', '--disable-setuid-sandbox']
+      });
       const options = {
         logLevel: 'error',
         output: 'json',
@@ -170,7 +173,8 @@ class WebAnalyzer {
     try {
       const browser = await puppeteer.launch({
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       });
       const page = await browser.newPage();
       await page.goto(this.url, { waitUntil: 'networkidle2', timeout: 30000 });
