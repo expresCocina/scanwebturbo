@@ -1,5 +1,4 @@
 const puppeteer = require('puppeteer');
-const lighthouse = require('lighthouse').default;
 const chromeLauncher = require('chrome-launcher');
 const cheerio = require('cheerio');
 const axios = require('axios');
@@ -73,6 +72,9 @@ class WebAnalyzer {
         onlyCategories: ['performance'],
         port: chrome.port
       };
+
+      // Dynamic import for Lighthouse since v10+ is ESM-only
+      const { default: lighthouse } = await import('lighthouse');
 
       const runnerResult = await lighthouse(this.url, options);
       await chrome.kill();
