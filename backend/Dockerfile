@@ -1,48 +1,26 @@
-# WebScan Backend - Dockerfile para Railway
-FROM node:18-slim
+# WebScan Backend — Railway Deploy
+# Usa la imagen oficial de Puppeteer que ya incluye Chromium
+FROM ghcr.io/puppeteer/puppeteer:21.11.0
 
-# Install dependencies para Puppeteer y Chrome
-RUN apt-get update && apt-get install -y \
-    wget \
-    ca-certificates \
-    fonts-liberation \
-    libappindicator3-1 \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libcups2 \
-    libdbus-1-3 \
-    libgdk-pixbuf2.0-0 \
-    libnspr4 \
-    libnss3 \
-    libx11-xcb1 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxrandr2 \
-    xdg-utils \
-    libgbm1 \
-    libxshmfence1 \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
-# Crear directorio de trabajo
+# Railway usa el usuario pptruser por defecto en esta imagen
 WORKDIR /app
 
-# Copiar package.json
-COPY package*.json ./
+# Copiar dependencias
+COPY --chown=pptruser:pptruser package*.json ./
 
-# Instalar dependencias
-RUN npm ci --only=production
+# Instalar solo producción (sin devDependencies)
+RUN npm ci --only=production --ignore-scripts
 
 # Copiar código fuente
-COPY . .
+COPY --chown=pptruser:pptruser src/ ./src/
 
-# Exponer puerto
+# Puerto que Railway expone
 EXPOSE 4000
 
-# Variable de entorno para Puppeteer
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false
+# Puppeteer ya tiene Chromium en esta imagen
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
+ENV NODE_ENV=production
 
-# Comando de inicio
+# Inicio
 CMD ["node", "src/index.js"]
