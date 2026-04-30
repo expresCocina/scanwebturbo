@@ -1,5 +1,4 @@
 const puppeteer = require('puppeteer');
-const chromeLauncher = require('chrome-launcher');
 const cheerio = require('cheerio');
 const axios = require('axios');
 
@@ -62,7 +61,10 @@ class WebAnalyzer {
     console.log('Analizando Performance...');
 
     try {
-      const chrome = await chromeLauncher.launch({
+      // Importaciones dinámicas para módulos ESM
+      const { launch } = await import('chrome-launcher');
+      
+      const chrome = await launch({
         chromePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
         chromeFlags: ['--headless', '--no-sandbox', '--disable-setuid-sandbox']
       });

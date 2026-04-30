@@ -1,6 +1,6 @@
 # WebScan Backend — Railway Deploy
-# Usa Node.js con Chrome instalado via apt (más confiable en Railway)
-FROM node:18-bullseye-slim
+# Usa Node.js 20 con Chrome instalado via apt
+FROM node:20-bullseye-slim
 
 # Instalar Chrome y dependencias necesarias para Puppeteer y Lighthouse
 RUN apt-get update && apt-get install -y \
