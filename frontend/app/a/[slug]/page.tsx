@@ -177,15 +177,15 @@ export default function PublicReportPage() {
       <div className="max-w-5xl mx-auto px-4 py-10">
 
         {/* ── HERO ── */}
-        <div className="text-center mb-12">
-          <p className="text-blue-400 text-sm uppercase tracking-widest mb-2">Reporte de Auditoría</p>
-          <h1 className="text-4xl font-black text-white mb-1">{audit.domain}</h1>
-          {audit.client_name && <p className="text-slate-400 mb-8">{audit.client_name}</p>}
+        <div className="text-center mb-10 sm:mb-12">
+          <p className="text-blue-400 text-xs sm:text-sm uppercase tracking-widest mb-2">Reporte de Auditoría</p>
+          <h1 className="text-2xl sm:text-4xl font-black text-white mb-1 break-all sm:break-normal">{audit.domain}</h1>
+          {audit.client_name && <p className="text-slate-400 mb-6 sm:mb-8 text-sm sm:text-base">{audit.client_name}</p>}
 
           {/* Global gauge */}
           <div className="inline-flex flex-col items-center">
             <div className="relative">
-              <Gauge score={audit.score_global || 0} size={180} stroke={16} />
+              <Gauge score={audit.score_global || 0} size={typeof window !== 'undefined' && window.innerWidth < 400 ? 140 : 180} stroke={14} />
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className={`text-5xl font-black ${globalInfo.color}`}>{audit.score_global}</span>
                 <span className="text-slate-400 text-sm">/100</span>
@@ -412,23 +412,23 @@ export default function PublicReportPage() {
         )}
 
         {/* ── CTA ── */}
-        <div className="mt-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-10 text-center shadow-2xl shadow-blue-900/40">
-          <div className="text-4xl mb-4">🚀</div>
-          <h2 className="text-2xl font-black text-white mb-3">¿Quieres arreglar estos problemas?</h2>
-          <p className="text-blue-100 mb-8 max-w-lg mx-auto text-sm leading-relaxed">
+        <div className="mt-10 sm:mt-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl sm:rounded-3xl p-6 sm:p-10 text-center shadow-2xl shadow-blue-900/40">
+          <div className="text-3xl sm:text-4xl mb-3 sm:mb-4">🚀</div>
+          <h2 className="text-xl sm:text-2xl font-black text-white mb-2 sm:mb-3">¿Quieres arreglar estos problemas?</h2>
+          <p className="text-blue-100 mb-6 sm:mb-8 max-w-lg mx-auto text-xs sm:text-sm leading-relaxed">
             Nuestro equipo en TurboBrand puede implementar todas las mejoras para ti. Más visitas, más clientes, más ventas.
             Agenda una llamada gratuita de 30 minutos.
           </p>
-          <div className="flex gap-4 justify-center flex-wrap">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
               onClick={() => window.open('https://turbobrandcol.com/contacto', '_blank')}
-              className="px-8 py-3 bg-white text-blue-700 font-bold rounded-2xl hover:bg-blue-50 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+              className="w-full sm:w-auto px-6 sm:px-8 py-3 bg-white text-blue-700 font-bold rounded-xl sm:rounded-2xl hover:bg-blue-50 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 text-sm sm:text-base"
             >
               Agendar llamada gratis →
             </button>
             <button
               onClick={() => window.open('https://turbobrandcol.com', '_blank')}
-              className="px-8 py-3 bg-white/10 border border-white/30 text-white font-medium rounded-2xl hover:bg-white/20 transition-all"
+              className="w-full sm:w-auto px-6 sm:px-8 py-3 bg-white/10 border border-white/30 text-white font-medium rounded-xl sm:rounded-2xl hover:bg-white/20 transition-all text-sm sm:text-base"
             >
               Conocer TurboBrand
             </button>
