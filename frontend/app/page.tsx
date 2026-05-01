@@ -234,7 +234,7 @@ export default function DashboardPage() {
           <h2 className="text-4xl font-black text-white mb-2">
             Panel de <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">Auditorías</span>
           </h2>
-          <p className="text-slate-400 text-sm">Analiza, detecta y corrige problemas de cualquier sitio web con inteligencia artificial</p>
+          <p className="text-slate-400 text-sm">Analiza, detecta y corrige problemas de cualquier sitio web de forma profesional</p>
         </div>
 
         {/* ── STATS ── */}

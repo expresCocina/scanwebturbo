@@ -152,7 +152,7 @@ export default function NewAuditPage() {
                     icon: '🔬',
                     title: 'Completa',
                     time: '5-7 minutos',
-                    desc: 'Análisis profundo + recomendaciones con IA',
+                    desc: 'Análisis profundo con recomendaciones detalladas y priorizadas',
                     recommended: true,
                   },
                 ]).map(opt => (
@@ -230,7 +230,7 @@ export default function NewAuditPage() {
               { icon: '📈', title: 'SEO Técnico', desc: 'Meta tags, estructura, indexabilidad' },
               { icon: '🛡️', title: 'Seguridad', desc: 'SSL, headers de seguridad, vulnerabilidades' },
               { icon: '👁️', title: 'Experiencia', desc: 'Responsive, accesibilidad, mobile-first' },
-              { icon: '🤖', title: 'IA Insights', desc: 'Recomendaciones priorizadas con Claude AI', span: 'sm:col-span-2' },
+              { icon: '📋', title: 'Recomendaciones', desc: 'Plan de mejoras priorizado con pasos concretos', span: 'sm:col-span-2' },
             ].map(item => (
               <div key={item.title} className={`flex items-start gap-3 p-3 rounded-xl bg-white/[0.03] ${(item as any).span || ''}`}>
                 <span className="text-xl flex-shrink-0">{item.icon}</span>
