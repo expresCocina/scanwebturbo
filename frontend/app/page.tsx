@@ -202,14 +202,15 @@ export default function DashboardPage() {
                         Ver Detalles
                       </Button>
                     </Link>
-                    <Link 
-                      href={`${process.env.NEXT_PUBLIC_AUDIT_URL}/a/${audit.public_slug}`}
+                    <a 
+                      href={`/a/${audit.public_slug}`}
                       target="_blank"
+                      rel="noopener noreferrer"
                     >
                       <Button variant="outline" size="sm">
                         Ver Reporte Público
                       </Button>
-                    </Link>
+                    </a>
                     <Button variant="outline" size="sm">
                       <Download className="w-4 h-4 mr-2" />
                       Descargar PDF
