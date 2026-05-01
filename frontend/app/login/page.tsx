@@ -182,14 +182,28 @@ export default function LoginPage() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true); setError('')
+
+    const timeout = setTimeout(() => {
+      setLoading(false)
+      setError('El servidor tardó demasiado. Verifica tu conexión e intenta de nuevo.')
+    }, 15000)
+
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
+      clearTimeout(timeout)
       if (error) throw error
       setLaunching(true)
-    } catch(err:any) {
-      const m = err.message||''
-      if(m.includes('Invalid login')) setError('Email o contraseña incorrectos.')
-      else setError('Error al ingresar. Intenta de nuevo.')
+    } catch(err: any) {
+      clearTimeout(timeout)
+      const m = (err?.message || '').toLowerCase()
+      if (m.includes('invalid login') || m.includes('invalid_grant') || m.includes('invalid credentials')) {
+        setError('Email o contraseña incorrectos.')
+      } else if (m.includes('email not confirmed')) {
+        setError('Confirma tu email antes de ingresar.')
+      } else {
+        setError('Error al ingresar. Intenta de nuevo.')
+      }
+    } finally {
       setLoading(false)
     }
   }
@@ -227,10 +241,10 @@ export default function LoginPage() {
 
       {/* Rocket */}
       {launching && <RocketLaunch onDone={()=>{
-        // Si hay una URL destino guardada, ir allí; sino al dashboard
         const params = new URLSearchParams(window.location.search)
         const next = params.get('next') || '/'
-        router.replace(next)
+        // Hard redirect so middleware re-reads cookies properly
+        window.location.href = next
       }} />}
 
       {/* Glow orbs */}

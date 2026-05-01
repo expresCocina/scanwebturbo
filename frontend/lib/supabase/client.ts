@@ -1,16 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createBrowserClient } from '@supabase/ssr'
 
-// Cliente para server components (solo usar en Server Components / API Routes)
-export const getSupabaseServer = () => createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// Cliente para client components
+// Cliente para client components (browser)
 export const getSupabaseClient = () => {
-  return createClientComponentClient()
+  return createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 }
+
+// Cliente con service role para server (NO usar en el frontend)
+export const getSupabaseAdmin = () =>
+  createClient(SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 
 // Tipos de la base de datos
 export type Audit = {
@@ -19,7 +20,7 @@ export type Audit = {
   client_name: string | null
   status: 'processing' | 'completed' | 'failed'
   score_global: number | null
-  created_by: string
+  created_by: string | null
   created_at: string
   completed_at: string | null
   public_slug: string
