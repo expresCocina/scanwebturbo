@@ -226,7 +226,12 @@ export default function LoginPage() {
       ))}
 
       {/* Rocket */}
-      {launching && <RocketLaunch onDone={()=>router.replace('/')} />}
+      {launching && <RocketLaunch onDone={()=>{
+        // Si hay una URL destino guardada, ir allí; sino al dashboard
+        const params = new URLSearchParams(window.location.search)
+        const next = params.get('next') || '/'
+        router.replace(next)
+      }} />}
 
       {/* Glow orbs */}
       <div className="fixed top-10 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
