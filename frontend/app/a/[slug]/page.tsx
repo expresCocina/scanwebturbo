@@ -421,7 +421,7 @@ export default function PublicReportPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
-              onClick={() => window.open('https://turbobrandcol.com/contacto', '_blank')}
+              onClick={() => window.open('https://www.turbobrandcol.com/agenda', '_blank')}
               className="w-full sm:w-auto px-6 sm:px-8 py-3 bg-white text-blue-700 font-bold rounded-xl sm:rounded-2xl hover:bg-blue-50 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 text-sm sm:text-base"
             >
               Agendar llamada gratis →
