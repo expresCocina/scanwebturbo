@@ -164,7 +164,9 @@ export default function PublicReportPage() {
       <nav className="border-b border-white/10 bg-slate-950/80 backdrop-blur-sm sticky top-0 z-30">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center font-black text-sm">TB</div>
+            <div className="w-9 h-9 rounded-lg overflow-hidden bg-blue-600 flex items-center justify-center">
+              <img src="/logo.png" alt="WebScan" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display='none'; }} />
+            </div>
             <span className="font-bold text-white">WebScan</span>
             <span className="text-slate-500 hidden sm:inline">por TurboBrand</span>
           </div>
