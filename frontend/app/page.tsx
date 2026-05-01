@@ -137,7 +137,32 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'completed' | 'processing' | 'failed'>('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
   const supabase = getSupabaseClient()
+
+  async function handleDownloadPDF(audit: Audit) {
+    if (downloadingId) return
+    setDownloadingId(audit.id)
+    toast.loading('Generando PDF...', { id: 'pdf' })
+    try {
+      const { generateAuditPDF } = await import('@/lib/pdf/generateReport')
+      const [{ data: cats }, { data: iss }] = await Promise.all([
+        supabase.from('audit_categories').select('*').eq('audit_id', audit.id),
+        supabase.from('audit_issues').select('*').eq('audit_id', audit.id),
+      ])
+      await generateAuditPDF(
+        { domain: audit.domain, client_name: audit.client_name, score_global: audit.score_global || 0, created_at: audit.created_at, public_slug: audit.public_slug },
+        cats || [],
+        iss || []
+      )
+      toast.success('PDF descargado correctamente', { id: 'pdf' })
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al generar PDF', { id: 'pdf' })
+    } finally {
+      setDownloadingId(null)
+    }
+  }
 
   useEffect(() => { loadAudits() }, [filter])
 
@@ -320,8 +345,16 @@ export default function DashboardPage() {
                         Reporte Público ↗
                       </button>
                     </a>
-                    <button className="px-4 py-2 bg-white/[0.05] hover:bg-white/10 border border-white/10 text-slate-400 hover:text-slate-300 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5">
-                      <span>⬇</span> PDF
+                    <button
+                      onClick={() => handleDownloadPDF(audit)}
+                      disabled={downloadingId === audit.id}
+                      className="px-4 py-2 bg-white/[0.05] hover:bg-white/10 border border-white/10 text-slate-400 hover:text-slate-300 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      {downloadingId === audit.id ? (
+                        <><span className="w-3 h-3 border border-slate-400/30 border-t-slate-400 rounded-full animate-spin" /> Generando...</>
+                      ) : (
+                        <><span>⬇</span> Descargar PDF</>
+                      )}
                     </button>
                   </div>
                 )}
