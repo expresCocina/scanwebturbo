@@ -405,17 +405,22 @@ export default function PublicReportPage() {
               const perfCat = categories.find(c => c.category === 'performance')
               const perfMetrics = (audit.report_data as any)?.categories?.performance?.metrics
               if (!perfMetrics || !perfCat) return null
+              
+              const formatMs = (ms: number | undefined) => ms !== undefined && ms !== null && typeof ms === 'number' ? `${(ms / 1000).toFixed(1)} s` : 'N/A';
+              const formatMsRaw = (ms: number | undefined) => ms !== undefined && ms !== null && typeof ms === 'number' ? `${ms} ms` : 'N/A';
+              const formatNum = (num: number | undefined) => num !== undefined && num !== null ? (typeof num === 'number' ? num.toFixed(3) : num) : 'N/A';
+              
               const metricsList = [
-                { key: 'fcp',      label: 'Primer contenido visible', value: perfMetrics.fcp,      tip: 'FCP (First Contentful Paint): El tiempo que tarda en aparecer el primer texto o imagen en tu pantalla. Menos de 1.8s = bueno. Si tarda más, los visitantes ven una pantalla en blanco y se van.' },
-                { key: 'ttfb',     label: 'Respuesta del servidor',   value: perfMetrics.ttfb,     tip: 'TTFB (Time To First Byte): Cuánto tarda tu servidor en empezar a responder. Es como el tiempo que esperas a que el mesero te atienda. Menos de 200ms es ideal.' },
-                { key: 'fullLoad', label: 'Carga completa',           value: perfMetrics.fullLoad, tip: 'Tiempo total hasta que la página termina de cargar todos sus elementos (imágenes, scripts, etc.). Menos de 3 segundos es bueno para la experiencia del usuario.' },
-                { key: 'totalSize',label: 'Peso total',               value: perfMetrics.totalSize,tip: 'La cantidad de datos que descarga el visitante al entrar a tu página. Menos de 1,500KB es recomendable. Un sitio pesado carga lento en celulares con datos móviles.' },
-                { key: 'jsFiles',  label: 'Scripts de código',        value: perfMetrics.jsFiles ? `${perfMetrics.jsFiles} archivos` : 'N/A', tip: 'Cantidad de archivos JavaScript que carga tu página. Cada archivo agrega tiempo de carga. Menos de 10 es ideal. Estos son los programas que hacen que tu página sea interactiva.' },
-                { key: 'resources',label: 'Recursos totales',         value: perfMetrics.resources ? `${perfMetrics.resources} archivos` : 'N/A', tip: 'Total de archivos que descarga tu página: imágenes, estilos, scripts, fuentes, etc. Menos archivos = carga más rápida.' },
+                { key: 'fcp',        label: 'First Contentful Paint',   value: formatMs(perfMetrics.fcp),       tip: 'FCP: El tiempo que tarda en aparecer el primer texto o imagen. Lo ideal es menos de 1.8s.' },
+                { key: 'lcp',        label: 'Largest Contentful Paint', value: formatMs(perfMetrics.lcp),       tip: 'LCP: El tiempo que tarda en cargar el elemento más grande de la página (ej. una imagen principal). Lo ideal es menos de 2.5s.' },
+                { key: 'tbt',        label: 'Total Blocking Time',      value: formatMsRaw(perfMetrics.tbt),    tip: 'TBT: Tiempo que la página está bloqueada y no responde a los clics del usuario. Lo ideal es menos de 200ms.' },
+                { key: 'cls',        label: 'Cambio de diseño (CLS)',   value: formatNum(perfMetrics.cls),      tip: 'CLS: Cuánto saltan los elementos en la pantalla mientras carga. Un valor alto significa que el usuario puede hacer clic donde no quería. Lo ideal es menos de 0.1.' },
+                { key: 'speedIndex', label: 'Speed Index',              value: formatMs(perfMetrics.speedIndex),tip: 'Mide la rapidez con la que se muestra visualmente el contenido durante la carga. Lo ideal es menos de 3.4s.' },
+                { key: 'ttfb',       label: 'Respuesta servidor',       value: formatMsRaw(perfMetrics.ttfb),   tip: 'TTFB: Cuánto tarda tu servidor en empezar a responder. Lo ideal es menos de 200ms.' },
               ]
               return (
                 <div className="bg-white/5 rounded-2xl border border-white/10 p-6">
-                  <h2 className="font-bold text-white mb-4">⚡ Métricas de velocidad <span className="text-xs text-slate-500 font-normal ml-2">— pasa el cursor sobre cada término para entenderlo</span></h2>
+                  <h2 className="font-bold text-white mb-4">⚡ Métricas de Core Web Vitals (Lighthouse) <span className="text-xs text-slate-500 font-normal ml-2">— pasa el cursor para entender</span></h2>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {metricsList.map(m => (
                       <Tip key={m.key} text={m.tip}>
@@ -424,12 +429,20 @@ export default function PublicReportPage() {
                             {m.label} <span className="text-blue-400/60 text-[10px]">ⓘ</span>
                           </div>
                           <div className={`font-bold text-base ${
-                            m.value === 'No medido' || m.value === 'N/A' ? 'text-slate-500' :
-                            m.key === 'fcp' || m.key === 'fullLoad' ? (
-                              parseFloat(String(m.value)) > 3 ? 'text-red-400' :
-                              parseFloat(String(m.value)) > 1.8 ? 'text-yellow-400' : 'text-green-400'
+                            m.value === 'N/A' || m.value.includes('No medido') ? 'text-slate-500' :
+                            (m.key === 'fcp' || m.key === 'lcp' || m.key === 'speedIndex') ? (
+                              parseFloat(m.value) > 3.0 ? 'text-red-400' :
+                              parseFloat(m.value) > 1.8 ? 'text-yellow-400' : 'text-green-400'
+                            ) :
+                            m.key === 'tbt' || m.key === 'ttfb' ? (
+                              parseFloat(m.value) > 600 ? 'text-red-400' :
+                              parseFloat(m.value) > 200 ? 'text-yellow-400' : 'text-green-400'
+                            ) :
+                            m.key === 'cls' ? (
+                              parseFloat(m.value) > 0.25 ? 'text-red-400' :
+                              parseFloat(m.value) > 0.1 ? 'text-yellow-400' : 'text-green-400'
                             ) : 'text-white'
-                          }`}>{m.value ?? 'N/A'}</div>
+                          }`}>{m.value}</div>
                         </div>
                       </Tip>
                     ))}

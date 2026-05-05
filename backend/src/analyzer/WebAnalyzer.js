@@ -96,6 +96,10 @@ class WebAnalyzer {
       const ttiMs = data.audits['interactive']?.numericValue || 0;
       const ttfbMs = data.audits['server-response-time']?.numericValue || 0;
       const totalBytes = data.audits['total-byte-weight']?.numericValue || 0;
+      const lcpMs = data.audits['largest-contentful-paint']?.numericValue || 0;
+      const clsValue = data.audits['cumulative-layout-shift']?.numericValue || 0;
+      const tbtMs = data.audits['total-blocking-time']?.numericValue || 0;
+      const speedIndexMs = data.audits['speed-index']?.numericValue || 0;
       
       // Intentar extraer el conteo de recursos si está disponible
       let jsCount = 0;
@@ -120,7 +124,11 @@ class WebAnalyzer {
         resourceCount,
         totalTransferKB: Math.round(totalBytes / 1024),
         jsCount,
-        imgCount
+        imgCount,
+        lcp: Math.round(lcpMs),
+        cls: clsValue,
+        tbt: Math.round(tbtMs),
+        speedIndex: Math.round(speedIndexMs)
       };
 
       const realScore = Math.round((data.categories.performance?.score || 0) * 100);
