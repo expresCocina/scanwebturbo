@@ -285,6 +285,10 @@ class WebAnalyzer {
         totalSize: metrics.totalTransferKB > 0 ? `${metrics.totalTransferKB}KB` : 'No medido',
         jsFiles: metrics.jsCount,
         resources: metrics.resourceCount,
+        lcp: metrics.lcp || 'N/A',
+        cls: metrics.cls || 'N/A',
+        tbt: metrics.tbt || 'N/A',
+        speedIndex: metrics.speedIndex || 'N/A'
       },
       issues,
       recommendations: [],
