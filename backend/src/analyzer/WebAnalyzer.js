@@ -385,39 +385,33 @@ class WebAnalyzer {
 
       // Robots.txt
       try {
-        const robotsResponse = await axios.get(`https://${this.domain}/robots.txt`);
-        if (robotsResponse.status !== 200) {
-          issues.push({
-            category: 'seo',
-            severity: 'bajo',
-            title: 'Sin robots.txt',
-            description: 'No se encontró archivo robots.txt',
-            howToFix: 'Crea /robots.txt con instrucciones para bots',
-            impact: 'Menor control sobre qué indexa Google'
-          });
-          seoScore -= 5;
-        }
-      } catch (error) {
-        // robots.txt no existe
+        const robotsResponse = await axios.get(`https://${this.domain}/robots.txt`, { timeout: 8000 });
+        if (robotsResponse.status !== 200) throw new Error('not found');
+      } catch {
+        issues.push({
+          category: 'seo',
+          severity: 'bajo',
+          title: 'Tu sitio no tiene un archivo de instrucciones para Google (robots.txt)',
+          description: 'Los motores de búsqueda como Google usan un archivo especial llamado robots.txt para saber qué páginas de tu sitio pueden o no pueden indexar. Tu sitio no tiene este archivo, lo que significa que Google entra sin ninguna guía.',
+          howToFix: 'Tu desarrollador puede crear este archivo en minutos. Básicamente es un documento de texto que le dice a Google qué páginas mostrar en sus resultados y cuáles ignorar (como páginas de administración o privadas).',
+          impact: 'Sin este archivo, Google puede indexar páginas que no quieres mostrar, y no sabe cuáles son tus páginas más importantes. Afecta ligeramente tu posicionamiento.'
+        });
         seoScore -= 5;
       }
 
       // Sitemap
       try {
-        const sitemapResponse = await axios.get(`https://${this.domain}/sitemap.xml`);
-        if (sitemapResponse.status !== 200) {
-          issues.push({
-            category: 'seo',
-            severity: 'medio',
-            title: 'Sin sitemap.xml',
-            description: 'No se encontró sitemap XML',
-            howToFix: 'Genera /sitemap.xml con todas tus URLs',
-            impact: 'Google tarda más en descubrir páginas nuevas'
-          });
-          seoScore -= 10;
-        }
-      } catch (error) {
-        // sitemap no existe
+        const sitemapResponse = await axios.get(`https://${this.domain}/sitemap.xml`, { timeout: 8000 });
+        if (sitemapResponse.status !== 200) throw new Error('not found');
+      } catch {
+        issues.push({
+          category: 'seo',
+          severity: 'medio',
+          title: 'Tu sitio no tiene mapa de páginas para Google (sitemap)',
+          description: 'Un sitemap es como un mapa de tu sitio web que le das a Google para que encuentre y entienda todas tus páginas. Sin él, Google tiene que descubrir tus páginas por su cuenta, lo que puede tardar semanas o meses.',
+          howToFix: 'Si usas WordPress, instala el plugin Yoast SEO o Rank Math — generan el sitemap automáticamente. Si es un sitio personalizado, tu desarrollador puede crearlo en una tarde. Luego debes enviarlo a Google Search Console.',
+          impact: 'Sin sitemap, tus páginas nuevas tardan mucho más en aparecer en Google. Si lanzas un producto nuevo o un artículo, puede que nadie lo encuentre por meses.'
+        });
         seoScore -= 10;
       }
 
