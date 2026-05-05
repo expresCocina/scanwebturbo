@@ -34,14 +34,12 @@ export default function NewAuditPage() {
         }).select().single()
       if (auditError) throw auditError
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_WORKER_URL || 'http://localhost:4000'}/api/analyze`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ auditId: audit.id, domain: cleanedDomain, analysisType })
-        }
-      )
+      // Call through Next.js proxy to avoid CORS issues
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auditId: audit.id, domain: cleanedDomain, analysisType })
+      })
       if (!response.ok) throw new Error('Error al iniciar análisis')
       toast.success('¡Auditoría iniciada! Te avisamos cuando esté lista.')
       router.push('/')
