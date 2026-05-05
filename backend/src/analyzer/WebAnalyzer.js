@@ -88,7 +88,10 @@ class WebAnalyzer {
 
     // Try Google PageSpeed API first, fall back to HTTP if it fails
     try {
-      const pageSpeedUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(this.url)}&strategy=mobile`;
+      let pageSpeedUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(this.url)}&strategy=mobile`;
+      if (process.env.PAGESPEED_API_KEY) {
+        pageSpeedUrl += `&key=${process.env.PAGESPEED_API_KEY}`;
+      }
       const response = await axios.get(pageSpeedUrl, { timeout: 60000 });
       const data = response.data.lighthouseResult;
 
@@ -139,7 +142,24 @@ class WebAnalyzer {
       return result;
 
     } catch (err) {
-      console.warn('PageSpeed API failed, using HTTP fallback:', err.message);
+      console.warn('PageSpeed API failed:', err.message);
+      
+      if (err.response && err.response.status === 429) {
+        return {
+          score: 0,
+          metrics: { fcp: 'N/A', ttfb: 'N/A', fullLoad: 'N/A', totalSize: 'N/A', jsFiles: 'N/A', resources: 'N/A' },
+          issues: [{
+            category: 'performance',
+            severity: 'critico',
+            title: 'Límite de Google PageSpeed excedido',
+            description: 'El servidor ha alcanzado el límite de consultas gratuitas a la API de Google PageSpeed Insights.',
+            howToFix: 'Agrega una variable PAGESPEED_API_KEY en Railway con tu clave de API de Google Cloud.',
+            impact: 'No se puede medir la velocidad hasta configurar la clave de API.'
+          }],
+          recommendations: []
+        };
+      }
+
       return await this._httpPerformance();
     }
   }
