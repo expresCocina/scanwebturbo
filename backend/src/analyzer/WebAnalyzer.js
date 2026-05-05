@@ -84,73 +84,56 @@ class WebAnalyzer {
   // PERFORMANCE ANALYSIS (Puppeteer + HTTP fallback)
   // =====================================================
   async analyzePerformance() {
-    console.log('Analizando Performance...');
+    console.log('Analizando Performance con Google PageSpeed Insights...');
 
-    // Try Puppeteer first, fall back to HTTP timing if blocked
+    // Try Google PageSpeed API first, fall back to HTTP if it fails
     try {
-      return await this._puppeteerPerformance();
+      const pageSpeedUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(this.url)}&strategy=mobile`;
+      const response = await axios.get(pageSpeedUrl, { timeout: 60000 });
+      const data = response.data.lighthouseResult;
+
+      const fcpMs = data.audits['first-contentful-paint']?.numericValue || 0;
+      const ttiMs = data.audits['interactive']?.numericValue || 0;
+      const ttfbMs = data.audits['server-response-time']?.numericValue || 0;
+      const totalBytes = data.audits['total-byte-weight']?.numericValue || 0;
+      
+      // Intentar extraer el conteo de recursos si está disponible
+      let jsCount = 0;
+      let imgCount = 0;
+      let resourceCount = 0;
+      
+      const resourceSummary = data.audits['resource-summary']?.details?.items;
+      if (resourceSummary) {
+        const jsStat = resourceSummary.find(item => item.resourceType === 'Script');
+        if (jsStat) jsCount = jsStat.requestCount || 0;
+        
+        const imgStat = resourceSummary.find(item => item.resourceType === 'Image');
+        if (imgStat) imgCount = imgStat.requestCount || 0;
+        
+        resourceCount = resourceSummary.reduce((acc, curr) => acc + (curr.requestCount || 0), 0);
+      }
+
+      const metrics = {
+        fcp: Math.round(fcpMs),
+        ttfb: Math.round(ttfbMs),
+        fullLoad: Math.round(ttiMs),
+        resourceCount,
+        totalTransferKB: Math.round(totalBytes / 1024),
+        jsCount,
+        imgCount
+      };
+
+      const realScore = Math.round((data.categories.performance?.score || 0) * 100);
+
+      const result = this._buildPerformanceResult(metrics, metrics.fullLoad);
+      result.score = realScore > 0 ? realScore : result.score; // Forzar el score real de Google
+      
+      return result;
+
     } catch (err) {
-      console.warn('Puppeteer performance failed, using HTTP fallback:', err.message);
+      console.warn('PageSpeed API failed, using HTTP fallback:', err.message);
       return await this._httpPerformance();
     }
-  }
-
-  async _puppeteerPerformance() {
-    const browser = await puppeteer.launch({
-      headless: true,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu',
-             '--disable-extensions', '--disable-background-networking']
-    });
-
-    const page = await browser.newPage();
-
-    // Simular navegador real para evitar bloqueos
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-    await page.setExtraHTTPHeaders({
-      'Accept-Language': 'es-CO,es;q=0.9,en;q=0.8',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-    });
-
-    // Bloquear recursos pesados no necesarios (fonts, imágenes grandes, analytics)
-    await page.setRequestInterception(true);
-    page.on('request', (req) => {
-      const type = req.resourceType();
-      if (['font', 'media', 'websocket'].includes(type)) {
-        req.abort();
-      } else {
-        req.continue();
-      }
-    });
-
-    const startTime = Date.now();
-    const response = await page.goto(this.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    
-    if (response && response.status() >= 400) {
-      throw new Error(`Bot blocked with status ${response.status()}`);
-    }
-
-    const loadTime = Date.now() - startTime;
-
-    const metrics = await page.evaluate(() => {
-      const nav = performance.getEntriesByType('navigation')[0];
-      const paint = performance.getEntriesByType('paint');
-      const fcp = paint.find(p => p.name === 'first-contentful-paint');
-      const resources = performance.getEntriesByType('resource');
-      const totalSize = resources.reduce((acc, r) => acc + (r.transferSize || 0), 0);
-      return {
-        ttfb: nav ? Math.round(nav.responseStart - nav.requestStart) : 0,
-        fullLoad: nav ? Math.round(nav.loadEventEnd) : 0,
-        fcp: fcp ? Math.round(fcp.startTime) : 0,
-        resourceCount: resources.length,
-        totalTransferKB: Math.round(totalSize / 1024),
-        jsCount: resources.filter(r => r.initiatorType === 'script').length,
-        imgCount: resources.filter(r => r.initiatorType === 'img').length,
-      };
-    });
-
-    await browser.close();
-    return this._buildPerformanceResult(metrics, loadTime);
   }
 
   async _httpPerformance() {
