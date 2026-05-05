@@ -399,7 +399,47 @@ export default function PublicReportPage() {
             </div>
 
 
+
+            {/* ── PERFORMANCE METRICS with tooltips ── */}
+            {(() => {
+              const perfCat = categories.find(c => c.category === 'performance')
+              const perfMetrics = (audit.report_data as any)?.categories?.performance?.metrics
+              if (!perfMetrics || !perfCat) return null
+              const metricsList = [
+                { key: 'fcp',      label: 'Primer contenido visible', value: perfMetrics.fcp,      tip: 'FCP (First Contentful Paint): El tiempo que tarda en aparecer el primer texto o imagen en tu pantalla. Menos de 1.8s = bueno. Si tarda más, los visitantes ven una pantalla en blanco y se van.' },
+                { key: 'ttfb',     label: 'Respuesta del servidor',   value: perfMetrics.ttfb,     tip: 'TTFB (Time To First Byte): Cuánto tarda tu servidor en empezar a responder. Es como el tiempo que esperas a que el mesero te atienda. Menos de 200ms es ideal.' },
+                { key: 'fullLoad', label: 'Carga completa',           value: perfMetrics.fullLoad, tip: 'Tiempo total hasta que la página termina de cargar todos sus elementos (imágenes, scripts, etc.). Menos de 3 segundos es bueno para la experiencia del usuario.' },
+                { key: 'totalSize',label: 'Peso total',               value: perfMetrics.totalSize,tip: 'La cantidad de datos que descarga el visitante al entrar a tu página. Menos de 1,500KB es recomendable. Un sitio pesado carga lento en celulares con datos móviles.' },
+                { key: 'jsFiles',  label: 'Scripts de código',        value: perfMetrics.jsFiles ? `${perfMetrics.jsFiles} archivos` : 'N/A', tip: 'Cantidad de archivos JavaScript que carga tu página. Cada archivo agrega tiempo de carga. Menos de 10 es ideal. Estos son los programas que hacen que tu página sea interactiva.' },
+                { key: 'resources',label: 'Recursos totales',         value: perfMetrics.resources ? `${perfMetrics.resources} archivos` : 'N/A', tip: 'Total de archivos que descarga tu página: imágenes, estilos, scripts, fuentes, etc. Menos archivos = carga más rápida.' },
+              ]
+              return (
+                <div className="bg-white/5 rounded-2xl border border-white/10 p-6">
+                  <h2 className="font-bold text-white mb-4">⚡ Métricas de velocidad <span className="text-xs text-slate-500 font-normal ml-2">— pasa el cursor sobre cada término para entenderlo</span></h2>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {metricsList.map(m => (
+                      <Tip key={m.key} text={m.tip}>
+                        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.07] cursor-help hover:border-blue-500/30 transition-colors">
+                          <div className="text-slate-400 text-xs mb-1 flex items-center gap-1">
+                            {m.label} <span className="text-blue-400/60 text-[10px]">ⓘ</span>
+                          </div>
+                          <div className={`font-bold text-base ${
+                            m.value === 'No medido' || m.value === 'N/A' ? 'text-slate-500' :
+                            m.key === 'fcp' || m.key === 'fullLoad' ? (
+                              parseFloat(String(m.value)) > 3 ? 'text-red-400' :
+                              parseFloat(String(m.value)) > 1.8 ? 'text-yellow-400' : 'text-green-400'
+                            ) : 'text-white'
+                          }`}>{m.value ?? 'N/A'}</div>
+                        </div>
+                      </Tip>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* What does it mean */}
+
             <div className="bg-white/5 rounded-2xl border border-white/10 p-6">
               <h2 className="font-bold text-white mb-4">💡 ¿Qué significa este score?</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

@@ -81,161 +81,196 @@ class WebAnalyzer {
   }
 
   // =====================================================
-  // PERFORMANCE ANALYSIS (Puppeteer + Navigation Timing API)
+  // PERFORMANCE ANALYSIS (Puppeteer + HTTP fallback)
   // =====================================================
   async analyzePerformance() {
     console.log('Analizando Performance...');
 
+    // Try Puppeteer first, fall back to HTTP timing if blocked
     try {
-      const browser = await puppeteer.launch({
-        headless: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
-      });
+      return await this._puppeteerPerformance();
+    } catch (err) {
+      console.warn('Puppeteer performance failed, using HTTP fallback:', err.message);
+      return await this._httpPerformance();
+    }
+  }
 
-      const page = await browser.newPage();
+  async _puppeteerPerformance() {
+    const browser = await puppeteer.launch({
+      headless: true,
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu',
+             '--disable-extensions', '--disable-background-networking']
+    });
 
-      // Emular conexión 4G promedio para métricas reales
-      await page.emulateNetworkConditions({
-        download: 10 * 1024 * 1024 / 8, // 10 Mbps
-        upload: 5 * 1024 * 1024 / 8,
-        latency: 40
-      });
+    const page = await browser.newPage();
 
-      const startTime = Date.now();
-      await page.goto(this.url, { waitUntil: 'networkidle2', timeout: 45000 });
-      const loadTime = Date.now() - startTime;
+    // Simular navegador real para evitar bloqueos
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    await page.setExtraHTTPHeaders({
+      'Accept-Language': 'es-CO,es;q=0.9,en;q=0.8',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    });
 
-      // Extraer métricas reales con Navigation Timing API
-      const metrics = await page.evaluate(() => {
-        const nav = performance.getEntriesByType('navigation')[0];
-        const paint = performance.getEntriesByType('paint');
-
-        const fcp = paint.find(p => p.name === 'first-contentful-paint');
-        const resources = performance.getEntriesByType('resource');
-        const totalSize = resources.reduce((acc, r) => acc + (r.transferSize || 0), 0);
-
-        return {
-          ttfb: nav ? Math.round(nav.responseStart - nav.requestStart) : 0,
-          domLoad: nav ? Math.round(nav.domContentLoadedEventEnd) : 0,
-          fullLoad: nav ? Math.round(nav.loadEventEnd) : 0,
-          fcp: fcp ? Math.round(fcp.startTime) : 0,
-          resourceCount: resources.length,
-          totalTransferKB: Math.round(totalSize / 1024),
-          jsCount: resources.filter(r => r.initiatorType === 'script').length,
-          cssCount: resources.filter(r => r.initiatorType === 'link').length,
-          imgCount: resources.filter(r => r.initiatorType === 'img').length,
-        };
-      });
-
-      await browser.close();
-
-      const fcpMs = metrics.fcp || loadTime;
-      const ttfbMs = metrics.ttfb;
-      const fullLoadMs = metrics.fullLoad || loadTime;
-
-      // Calcular score basado en métricas reales
-      let score = 100;
-
-      // FCP: < 1.8s = good, 1.8-3s = ok, >3s = bad
-      if (fcpMs > 3000) score -= 30;
-      else if (fcpMs > 1800) score -= 15;
-
-      // TTFB: < 200ms = good, 200-500ms = ok, > 500ms = bad
-      if (ttfbMs > 500) score -= 20;
-      else if (ttfbMs > 200) score -= 10;
-
-      // Full load: < 3s = good, 3-6s = ok, > 6s = bad
-      if (fullLoadMs > 6000) score -= 25;
-      else if (fullLoadMs > 3000) score -= 12;
-
-      // Peso de la página
-      if (metrics.totalTransferKB > 3000) score -= 15;
-      else if (metrics.totalTransferKB > 1500) score -= 8;
-
-      // JS excesivo
-      if (metrics.jsCount > 20) score -= 10;
-      else if (metrics.jsCount > 10) score -= 5;
-
-      score = Math.max(0, Math.min(100, score));
-
-      const issues = [];
-
-      if (fcpMs > 1800) {
-        issues.push({
-          category: 'performance',
-          severity: fcpMs > 3000 ? 'critico' : 'alto',
-          title: 'Primer contenido tarda demasiado en aparecer',
-          description: `Tu sitio tarda ${(fcpMs/1000).toFixed(1)}s en mostrar el primer contenido visible. Lo ideal es menos de 1.8 segundos.`,
-          howToFix: 'Reduce el tamaño de imágenes, activa la compresión GZIP en el servidor y usa una CDN para servir los archivos más rápido.',
-          impact: 'Los visitantes abandonan la página si no ven nada en 3 segundos. Esto reduce directamente las ventas y consultas.'
-        });
+    // Bloquear recursos pesados no necesarios (fonts, imágenes grandes, analytics)
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+      const type = req.resourceType();
+      if (['font', 'media', 'websocket'].includes(type)) {
+        req.abort();
+      } else {
+        req.continue();
       }
+    });
 
-      if (ttfbMs > 200) {
-        issues.push({
-          category: 'performance',
-          severity: ttfbMs > 500 ? 'alto' : 'medio',
-          title: 'Servidor responde lentamente (TTFB)',
-          description: `El servidor tarda ${ttfbMs}ms en responder. Lo recomendado es menos de 200ms.`,
-          howToFix: 'Mejora el hosting o cambia a un plan con mejor rendimiento. Activa caché del servidor.',
-          impact: 'Un servidor lento afecta el posicionamiento en Google y la experiencia del usuario.'
-        });
-      }
+    const startTime = Date.now();
+    await page.goto(this.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    const loadTime = Date.now() - startTime;
 
-      if (metrics.totalTransferKB > 1500) {
-        issues.push({
-          category: 'performance',
-          severity: metrics.totalTransferKB > 3000 ? 'alto' : 'medio',
-          title: 'Página muy pesada',
-          description: `Tu sitio descarga ${metrics.totalTransferKB}KB de datos. Lo ideal es menos de 1,500KB.`,
-          howToFix: 'Comprime y optimiza imágenes, minifica archivos CSS y JavaScript, elimina recursos innecesarios.',
-          impact: 'En conexiones móviles lentas, páginas pesadas cargan muy despacio y hacen que los usuarios se vayan.'
-        });
-      }
-
-      if (metrics.jsCount > 10) {
-        issues.push({
-          category: 'performance',
-          severity: 'medio',
-          title: `Demasiados archivos JavaScript (${metrics.jsCount})`,
-          description: `Se cargan ${metrics.jsCount} archivos JavaScript. Cada uno añade tiempo de carga.`,
-          howToFix: 'Combina y minifica scripts, carga JavaScript de forma asíncrona, elimina scripts no utilizados.',
-          impact: 'Muchos scripts hacen que el navegador trabaje más y la página tarde más en responder.'
-        });
-      }
-
+    const metrics = await page.evaluate(() => {
+      const nav = performance.getEntriesByType('navigation')[0];
+      const paint = performance.getEntriesByType('paint');
+      const fcp = paint.find(p => p.name === 'first-contentful-paint');
+      const resources = performance.getEntriesByType('resource');
+      const totalSize = resources.reduce((acc, r) => acc + (r.transferSize || 0), 0);
       return {
-        score,
-        metrics: {
-          fcp: `${(fcpMs/1000).toFixed(1)}s`,
-          ttfb: `${ttfbMs}ms`,
-          fullLoad: `${(fullLoadMs/1000).toFixed(1)}s`,
-          totalSize: `${metrics.totalTransferKB}KB`,
-          jsFiles: metrics.jsCount,
-          resources: metrics.resourceCount
-        },
-        issues,
-        recommendations: []
+        ttfb: nav ? Math.round(nav.responseStart - nav.requestStart) : 0,
+        fullLoad: nav ? Math.round(nav.loadEventEnd) : 0,
+        fcp: fcp ? Math.round(fcp.startTime) : 0,
+        resourceCount: resources.length,
+        totalTransferKB: Math.round(totalSize / 1024),
+        jsCount: resources.filter(r => r.initiatorType === 'script').length,
+        imgCount: resources.filter(r => r.initiatorType === 'img').length,
       };
+    });
 
-    } catch (error) {
-      console.error('Error en análisis de performance:', error.message);
+    await browser.close();
+    return this._buildPerformanceResult(metrics, loadTime);
+  }
+
+  async _httpPerformance() {
+    // Fallback: medir solo TTFB y tiempo total con HTTP
+    const startTime = Date.now();
+    let ttfbMs = 0;
+    let loadTime = 0;
+
+    try {
+      const response = await axios.get(this.url, {
+        timeout: 15000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
+        },
+        maxRedirects: 5,
+      });
+      loadTime = Date.now() - startTime;
+      ttfbMs = loadTime; // aproximación
+      const html = response.data || '';
+      const imgCount = (html.match(/<img/gi) || []).length;
+      const scriptCount = (html.match(/<script/gi) || []).length;
+      const sizeKB = Math.round(Buffer.byteLength(html, 'utf8') / 1024);
+
+      return this._buildPerformanceResult({
+        ttfb: ttfbMs,
+        fullLoad: loadTime,
+        fcp: loadTime,
+        resourceCount: imgCount + scriptCount,
+        totalTransferKB: sizeKB,
+        jsCount: scriptCount,
+        imgCount,
+      }, loadTime);
+    } catch (e) {
+      // Si ambos fallan, devolver score parcial con mensaje amigable
       return {
-        score: 0,
-        metrics: {},
+        score: 50,
+        metrics: { fcp: 'No medido', ttfb: 'No medido', fullLoad: 'No medido', totalSize: 'No medido', jsFiles: 0, resources: 0 },
         issues: [{
           category: 'performance',
-          severity: 'critico',
-          title: 'No se pudo analizar la velocidad',
-          description: `Error al conectar con el sitio: ${error.message}`,
-          howToFix: 'Verifica que el sitio esté accesible públicamente y no bloquee bots.',
-          impact: 'No se puede medir el rendimiento del sitio.'
+          severity: 'medio',
+          title: 'No se pudo medir la velocidad automáticamente',
+          description: 'El sistema no pudo conectarse al sitio para medir su velocidad. Esto puede ocurrir si el sitio tiene protección anti-bots o si está caído temporalmente. La velocidad es un factor clave en Google.',
+          howToFix: 'Puedes medir tu velocidad manualmente en PageSpeed Insights (pagespeed.web.dev). Comparte el resultado con tu desarrollador para priorizar las optimizaciones.',
+          impact: 'Un sitio lento pierde visitas. Google usa la velocidad como factor de posicionamiento — sitios más rápidos aparecen más arriba en los resultados.',
         }],
-        recommendations: []
+        recommendations: [],
       };
     }
   }
+
+  _buildPerformanceResult(metrics, loadTime) {
+    const fcpMs = metrics.fcp || loadTime;
+    const ttfbMs = metrics.ttfb || 0;
+    const fullLoadMs = metrics.fullLoad || loadTime;
+
+    let score = 100;
+    if (fcpMs > 3000) score -= 30; else if (fcpMs > 1800) score -= 15;
+    if (ttfbMs > 500) score -= 20; else if (ttfbMs > 200) score -= 10;
+    if (fullLoadMs > 6000) score -= 25; else if (fullLoadMs > 3000) score -= 12;
+    if (metrics.totalTransferKB > 3000) score -= 15; else if (metrics.totalTransferKB > 1500) score -= 8;
+    if (metrics.jsCount > 20) score -= 10; else if (metrics.jsCount > 10) score -= 5;
+    score = Math.max(10, Math.min(100, score));
+
+    const issues = [];
+
+    if (fcpMs > 1800) {
+      issues.push({
+        category: 'performance',
+        severity: fcpMs > 3000 ? 'critico' : 'alto',
+        title: 'Tu sitio tarda demasiado en mostrar contenido',
+        description: `Tu sitio tarda ${(fcpMs / 1000).toFixed(1)} segundos en mostrar el primer contenido visible. Lo ideal es menos de 1.8 segundos. Un segundo de retraso reduce las conversiones hasta un 7%.`,
+        howToFix: 'Optimiza las imágenes del sitio (usa formatos WebP), activa la compresión GZIP en el servidor, y considera usar una red de entrega de contenido (CDN). Tu desarrollador puede implementar esto en 1-2 días.',
+        impact: 'Los visitantes abandonan páginas lentas antes de ver tu oferta. Si tienes 1,000 visitas al mes y el sitio es lento, puedes estar perdiendo 300-400 clientes potenciales.',
+      });
+    }
+
+    if (ttfbMs > 200) {
+      issues.push({
+        category: 'performance',
+        severity: ttfbMs > 500 ? 'alto' : 'medio',
+        title: 'Tu servidor responde lento',
+        description: `Tu servidor tarda ${ttfbMs} milisegundos en responder. Esto es como si un empleado tardara ${ttfbMs > 500 ? 'varios segundos' : 'un momento'} en atender al cliente. Lo ideal es menos de 200ms.`,
+        howToFix: 'Considera mejorar tu plan de hosting, activar caché del servidor, u optimizar la base de datos si tu sitio es dinámico. Un buen hosting en Latinoamérica puede marcar la diferencia.',
+        impact: 'Google usa la velocidad del servidor como factor de posicionamiento. Un servidor lento te baja en los resultados de búsqueda directamente.',
+      });
+    }
+
+    if (metrics.totalTransferKB > 1500) {
+      issues.push({
+        category: 'performance',
+        severity: metrics.totalTransferKB > 3000 ? 'alto' : 'medio',
+        title: 'Tu página es demasiado pesada',
+        description: `Tu sitio descarga ${metrics.totalTransferKB} KB de datos. Imagina que cada visitante tiene que descargar un archivo de ese tamaño antes de ver tu página. En celulares con datos móviles, esto se siente muy lento.`,
+        howToFix: 'Comprime las imágenes antes de subirlas, elimina plugins o scripts que no usas, y minifica los archivos de código. Herramientas como TinyPNG (para imágenes) son gratuitas.',
+        impact: 'En Colombia, muchos usuarios tienen conexiones móviles lentas. Un sitio pesado puede tardar 10+ segundos en cargar en 3G, haciendo que el cliente se vaya sin ver tu oferta.',
+      });
+    }
+
+    if (metrics.jsCount > 10) {
+      issues.push({
+        category: 'performance',
+        severity: 'medio',
+        title: `Demasiados scripts cargando en tu página (${metrics.jsCount})`,
+        description: `Tu sitio carga ${metrics.jsCount} archivos de código JavaScript. Cada uno de estos archivos debe descargarse y ejecutarse antes de que la página funcione correctamente. Es como tener ${metrics.jsCount} puertas que abrir antes de entrar a la tienda.`,
+        howToFix: 'Elimina plugins o herramientas que no usas activamente. Asegúrate de cargar los scripts de redes sociales y analytics de forma diferida (lazy loading). Tu desarrollador puede auditarlos.',
+        impact: 'Muchos scripts ralentizan la interactividad de tu sitio. Los usuarios no pueden hacer clic en botones ni rellenar formularios hasta que todos los scripts cargan.',
+      });
+    }
+
+    return {
+      score,
+      metrics: {
+        fcp: fcpMs > 0 ? `${(fcpMs / 1000).toFixed(1)}s` : 'No medido',
+        ttfb: ttfbMs > 0 ? `${ttfbMs}ms` : 'No medido',
+        fullLoad: fullLoadMs > 0 ? `${(fullLoadMs / 1000).toFixed(1)}s` : 'No medido',
+        totalSize: metrics.totalTransferKB > 0 ? `${metrics.totalTransferKB}KB` : 'No medido',
+        jsFiles: metrics.jsCount,
+        resources: metrics.resourceCount,
+      },
+      issues,
+      recommendations: [],
+    };
+  }
+
 
 
   // =====================================================
