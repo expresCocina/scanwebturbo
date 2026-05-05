@@ -1,12 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
+const WebSocket = require('ws'); // Required for Node 20
 const WebAnalyzer = require('../analyzer/WebAnalyzer');
 const AIProcessor = require('../ai/AIProcessor');
 
+global.WebSocket = WebSocket; // Polyfill for Supabase Realtime
+
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  {
+    auth: { persistSession: false },
+    realtime: {
+      transport: WebSocket
+    }
+  }
 );
 
 // =====================================================
