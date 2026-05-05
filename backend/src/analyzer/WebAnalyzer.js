@@ -23,11 +23,15 @@ class WebAnalyzer {
       url: this.url,
       categories: {},
       issues: [],
+      screenshot: null,
       timestamp: new Date().toISOString()
     };
 
     try {
-      // 1. Performance (Lighthouse)
+      // 0. Captura de pantalla
+      results.screenshot = await this.takeScreenshot();
+
+      // 1. Performance
       const performanceData = await this.analyzePerformance();
       results.categories.performance = performanceData;
 
@@ -52,6 +56,28 @@ class WebAnalyzer {
     }
 
     return results;
+  }
+
+  // =====================================================
+  // SCREENSHOT (full-page, desktop)
+  // =====================================================
+  async takeScreenshot() {
+    try {
+      const browser = await puppeteer.launch({
+        headless: true,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+      });
+      const page = await browser.newPage();
+      await page.setViewport({ width: 1280, height: 800 });
+      await page.goto(this.url, { waitUntil: 'networkidle2', timeout: 30000 });
+      const shot = await page.screenshot({ type: 'jpeg', quality: 70, fullPage: false });
+      await browser.close();
+      return `data:image/jpeg;base64,${shot.toString('base64')}`;
+    } catch (e) {
+      console.error('Screenshot error:', e.message);
+      return null;
+    }
   }
 
   // =====================================================
@@ -239,20 +265,20 @@ class WebAnalyzer {
         issues.push({
           category: 'seo',
           severity: 'critico',
-          title: 'Sin meta title',
-          description: 'La página no tiene tag <title>',
-          howToFix: 'Agrega <title>Tu Título - 50-60 caracteres</title> en el <head>',
-          impact: 'Google no sabe de qué trata tu página, 0 ranking posible'
+          title: 'Tu página no tiene título visible en Google',
+          description: 'Cuando alguien busca en Google, el título de tu página es lo primero que ve. Tu sitio no tiene título configurado, lo que significa que Google no sabe cómo presentarlo — simplemente muestra la URL, que nadie hace clic.',
+          howToFix: 'Necesitas agregar una línea en el código que diga de qué trata tu página. Por ejemplo: si vendes zapatos en Bogotá, el título ideal sería "Zapatos de mujer en Bogotá | Tu Marca". Tu desarrollador puede hacerlo en minutos.',
+          impact: 'Sin título, tu página prácticamente no existe en Google. Estás perdiendo visitas y clientes potenciales todos los días.'
         });
         seoScore -= 20;
       } else if (title.length < 30 || title.length > 60) {
         issues.push({
           category: 'seo',
           severity: 'alto',
-          title: 'Meta title con longitud incorrecta',
-          description: `El título tiene ${title.length} caracteres (óptimo: 50-60)`,
-          howToFix: 'Ajusta el título a 50-60 caracteres',
-          impact: 'Se corta en resultados de Google'
+          title: `El título de tu página está ${title.length > 60 ? 'demasiado largo' : 'muy corto'} para Google`,
+          description: `El título de tu sitio tiene ${title.length} caracteres. Google muestra máximo 60 caracteres — si es más largo, lo corta con "..." y se ve incompleto. Si es muy corto, no describe bien tu negocio.`,
+          howToFix: 'Ajusta el título a entre 50 y 60 caracteres. Incluye tu servicio principal y ciudad si aplica. Ejemplo: "Servicios de Contabilidad en Medellín | Empresa XYZ".',
+          impact: 'Un título cortado o vago hace que los usuarios prefieran hacer clic en tu competencia.'
         });
         seoScore -= 10;
       }
@@ -263,20 +289,20 @@ class WebAnalyzer {
         issues.push({
           category: 'seo',
           severity: 'critico',
-          title: 'Sin meta description',
-          description: 'No hay meta description',
-          howToFix: 'Agrega <meta name="description" content="Tu descripción aquí">',
-          impact: 'Google no muestra descripción atractiva, -30% CTR'
+          title: 'Tu página no tiene descripción en Google',
+          description: 'Debajo del título en Google aparece una descripción de 2 líneas que convence al usuario de hacer clic. Tu sitio no tiene esta descripción configurada, así que Google muestra texto aleatorio de tu página — usualmente algo sin sentido.',
+          howToFix: 'Escribe una descripción de 1-2 frases que explique qué ofreces y por qué el cliente debería elegirte. Ejemplo: "Somos expertos en diseño web en Cali. Creamos sitios que venden. Cotiza gratis hoy." Tu desarrollador la agrega en 5 minutos.',
+          impact: 'Sin descripción, pierdes hasta un 30% de los clics que podrías tener. Personas que te buscaron pero eligieron a tu competencia.'
         });
         seoScore -= 20;
       } else if (description.length < 120 || description.length > 160) {
         issues.push({
           category: 'seo',
           severity: 'medio',
-          title: 'Meta description con longitud incorrecta',
-          description: `La descripción tiene ${description.length} caracteres (óptimo: 120-160)`,
-          howToFix: 'Ajusta la descripción a 120-160 caracteres',
-          impact: 'Se corta en resultados de búsqueda'
+          title: `La descripción de tu sitio está ${description.length > 160 ? 'cortada' : 'incompleta'} en Google`,
+          description: `Tu descripción tiene ${description.length} caracteres. Google muestra entre 120-160 caracteres — si es más larga, la corta con "..." justo cuando estaba convenciendo al cliente. Si es muy corta, no dice suficiente.`,
+          howToFix: 'Ajusta la descripción para que tenga entre 120 y 160 caracteres. Incluye qué haces, dónde y qué te diferencia. Termina con una llamada a la acción como "Contáctanos" o "Ver catálogo".',
+          impact: 'Una descripción cortada o incompleta reduce la confianza del usuario y las probabilidades de que haga clic en tu sitio.'
         });
         seoScore -= 5;
       }
@@ -287,20 +313,20 @@ class WebAnalyzer {
         issues.push({
           category: 'seo',
           severity: 'alto',
-          title: 'Sin H1 en la página',
-          description: 'No hay ningún <h1>',
-          howToFix: 'Agrega un <h1> con el tema principal de la página',
-          impact: 'Google no identifica tema principal'
+          title: 'Tu página no tiene un titular principal',
+          description: 'Cada página web debe tener un titular principal (llamado H1) que le dice a Google y a los visitantes de qué se trata. Es como el título de un periódico. Tu página no lo tiene, lo que confunde a los motores de búsqueda.',
+          howToFix: 'Agrega un titular grande y claro al inicio de tu página que describa tu negocio o servicio. Por ejemplo: "Servicios de Plomería en Bogotá" o "Ropa de Mujer Exclusiva". Tu diseñador web puede hacerlo en minutos.',
+          impact: 'Sin titular principal, Google no sabe de qué trata tu página y te posiciona más abajo en los resultados de búsqueda.'
         });
         seoScore -= 15;
       } else if (h1Count > 1) {
         issues.push({
           category: 'seo',
           severity: 'medio',
-          title: 'Múltiples H1 en la página',
-          description: `Hay ${h1Count} H1 (debe haber solo 1)`,
-          howToFix: 'Usa solo un H1, los demás deben ser H2, H3, etc.',
-          impact: 'Confunde a Google sobre jerarquía de contenido'
+          title: `Tu página tiene ${h1Count} titulares principales cuando solo debe tener 1`,
+          description: `Encontramos ${h1Count} titulares principales en tu página. Es como si un periódico tuviera ${h1Count} titulares iguales de importancia — confunde al lector y a Google sobre cuál es el tema principal.`,
+          howToFix: 'Deja solo un titular principal (el más importante). Los demás conviértelos en subtítulos secundarios (H2, H3). Tu desarrollador puede identificarlos y corregirlos fácilmente.',
+          impact: 'Tener varios titulares principales divide la "fuerza" de posicionamiento entre todos, debilitando tu presencia en Google.'
         });
         seoScore -= 5;
       }
@@ -314,10 +340,10 @@ class WebAnalyzer {
         issues.push({
           category: 'seo',
           severity: 'medio',
-          title: 'Open Graph incompleto',
-          description: 'Faltan tags OG para redes sociales',
-          howToFix: 'Agrega og:title, og:description, og:image',
-          impact: 'Se ve mal al compartir en Facebook, LinkedIn, WhatsApp'
+          title: 'Tu sitio se ve feo cuando lo comparten en WhatsApp o redes sociales',
+          description: 'Cuando alguien comparte el enlace de tu negocio en WhatsApp, Facebook o LinkedIn, debería aparecer una tarjeta bonita con imagen, título y descripción. Tu sitio no está configurado para esto, así que solo se muestra el link feo sin imagen ni contexto.',
+          howToFix: 'Configura las "etiquetas de redes sociales" (Open Graph). Básicamente es decirle a WhatsApp y Facebook qué imagen y texto mostrar cuando compartan tu link. Tu desarrollador puede hacerlo en menos de una hora.',
+          impact: 'Un link sin imagen genera mucho menos clics. Estás perdiendo tráfico de personas que comparten tu sitio en grupos de WhatsApp o redes sociales.'
         });
         seoScore -= 10;
       }
@@ -400,10 +426,10 @@ class WebAnalyzer {
         issues.push({
           category: 'security',
           severity: 'critico',
-          title: 'Sin HTTPS (SSL)',
-          description: 'El sitio no usa conexión segura',
-          howToFix: 'Instala certificado SSL (Let\'s Encrypt es gratis)',
-          impact: 'Datos sin cifrar, Google penaliza -15pts ranking, navegadores muestran "No seguro"'
+          title: 'Tu sitio NO es seguro — Google y Chrome lo marcan como peligroso',
+          description: 'Tu sitio web no tiene el candadito verde de seguridad (SSL/HTTPS). Cuando un visitante llega, Chrome y Firefox le muestran una advertencia roja que dice "Sitio no seguro". La mayoría de personas se va inmediatamente al ver eso.',
+          howToFix: 'Necesitas instalar un certificado de seguridad SSL en tu servidor. Muchos hostings como Hostinger, GoDaddy o SiteGround lo ofrecen gratis con un clic. Si tienes cPanel, busca la opción "SSL" y actívalo. Es urgente.',
+          impact: 'Google penaliza los sitios sin SSL bajándolos en resultados de búsqueda. Además, el 85% de usuarios NO confía en sitios sin candado y se van sin comprar ni contactarte.'
         });
         securityScore -= 50;
       }
@@ -416,10 +442,10 @@ class WebAnalyzer {
         issues.push({
           category: 'security',
           severity: 'medio',
-          title: 'Sin header HSTS',
-          description: 'Falta Strict-Transport-Security header',
-          howToFix: 'Agrega header: Strict-Transport-Security: max-age=31536000',
-          impact: 'Vulnerable a ataques downgrade SSL'
+          title: 'Tu sitio puede ser interceptado por hackers (sin HSTS)',
+          description: 'Aunque tu sitio tiene el candado SSL, tiene una vulnerabilidad: un atacante podría engañar a los visitantes para que se conecten sin seguridad sin que se den cuenta. Esto se llama ataque de "degradación" y tu sitio actualmente no está protegido contra eso.',
+          howToFix: 'Tu desarrollador o administrador del servidor debe agregar una configuración de seguridad que obligue siempre a usar la conexión cifrada. Se hace en el servidor web (Apache, Nginx o el panel de hosting) en menos de 10 minutos.',
+          impact: 'Sin esta protección, la información de tus clientes (formularios, datos de contacto) podría ser interceptada en redes WiFi públicas o inseguras.'
         });
         securityScore -= 10;
       }
@@ -428,10 +454,10 @@ class WebAnalyzer {
         issues.push({
           category: 'security',
           severity: 'alto',
-          title: 'Sin protección X-Frame-Options',
-          description: 'Falta header X-Frame-Options',
-          howToFix: 'Agrega header: X-Frame-Options: DENY',
-          impact: 'Vulnerable a clickjacking'
+          title: 'Tu sitio puede ser copiado dentro de otras páginas web (Clickjacking)',
+          description: 'Existe un tipo de ataque en el que los hackers ponen tu sitio web "invisible" dentro de otra página falsa. El usuario cree que está en tu página real, hace clic o escribe datos, pero en realidad está en una trampa. Tu sitio no tiene protección contra esto.',
+          howToFix: 'Tu desarrollador o administrador del servidor puede agregar una línea de configuración que impide que tu sitio sea incrustado en otras páginas. Se resuelve en minutos modificando la configuración del servidor web.',
+          impact: 'Si tus clientes son víctimas de este engaño usando tu página, se daña la reputación de tu negocio y podrías perder la confianza de tus usuarios.'
         });
         securityScore -= 15;
       }
@@ -440,10 +466,10 @@ class WebAnalyzer {
         issues.push({
           category: 'security',
           severity: 'medio',
-          title: 'Sin X-Content-Type-Options',
-          description: 'Falta header X-Content-Type-Options',
-          howToFix: 'Agrega header: X-Content-Type-Options: nosniff',
-          impact: 'Vulnerable a MIME sniffing attacks'
+          title: 'Tu sitio permite que se ejecuten archivos maliciosos',
+          description: 'Hay una configuración de seguridad faltante que podría permitir que hackers engañen al navegador para ejecutar archivos dañinos como si fueran seguros. Es una vulnerabilidad técnica pero con consecuencias reales para tus visitantes.',
+          howToFix: 'Tu desarrollador agrega una línea de configuración en el servidor (X-Content-Type-Options: nosniff) que soluciona el problema en menos de 5 minutos. Es un cambio pequeño pero importante.',
+          impact: 'Aunque es una vulnerabilidad técnica, si es explotada puede afectar la experiencia y seguridad de los visitantes de tu sitio, dañando tu reputación.'
         });
         securityScore -= 10;
       }
@@ -500,10 +526,10 @@ class WebAnalyzer {
         issues.push({
           category: 'ux',
           severity: 'critico',
-          title: 'No es mobile-friendly',
-          description: 'Falta meta viewport',
-          howToFix: 'Agrega <meta name="viewport" content="width=device-width, initial-scale=1">',
-          impact: 'Se ve horrible en celular, Google penaliza en mobile'
+          title: 'Tu sitio se ve roto en celulares y tablets',
+          description: 'Más del 70% de las personas navegan desde su celular. Tu sitio no está configurado para verse bien en dispositivos móviles: el texto aparece diminuto, los botones no se pueden tocar y el usuario tiene que hacer zoom para leer. Eso los hace irse inmediatamente.',
+          howToFix: 'Tu desarrollador necesita hacer tu sitio "responsive" (adaptable a cualquier pantalla). Si usas WordPress, muchos temas ya lo hacen automáticamente. Si es un sitio personalizado, es un trabajo de diseño que puede tomar entre 1 y 3 días.',
+          impact: 'Google prioriza los sitios mobile-friendly en sus resultados. Si tu sitio no funciona en celular, Google te baja drásticamente y tus clientes móviles se van con tu competencia.'
         });
         uxScore -= 30;
       }
@@ -516,10 +542,10 @@ class WebAnalyzer {
           issues.push({
             category: 'ux',
             severity: 'alto',
-            title: 'Formulario sin HTTPS',
-            description: 'Hay formularios que envían datos sin cifrar',
-            howToFix: 'Cambia action del form a HTTPS',
-            impact: 'Datos de usuarios vulnerables'
+            title: 'Los datos que envían tus clientes en formularios no están protegidos',
+            description: 'Tienes formularios de contacto, cotización o registro en tu sitio, pero la información que escriben los usuarios (nombre, teléfono, email) viaja sin cifrar por internet. Es como enviar una carta sin sobre — cualquiera puede leerla.',
+            howToFix: 'Tu desarrollador debe cambiar la configuración del formulario para que use conexión segura HTTPS. Es un cambio de una línea en el código que se hace en minutos.',
+            impact: 'Si los datos de tus clientes son interceptados, puede haber problemas legales y pérdida total de confianza. En Colombia, la Ley 1581 de protección de datos exige medidas de seguridad básicas.'
           });
           uxScore -= 20;
           break;

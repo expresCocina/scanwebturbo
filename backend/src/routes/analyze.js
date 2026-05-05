@@ -156,6 +156,7 @@ async function performAnalysis(auditId, domain, analysisType) {
         score_global: scoreGlobal,
         report_data: {
           ...analysisResults,
+          screenshot: analysisResults.screenshot || null,
           ai: aiResults
         }
       })

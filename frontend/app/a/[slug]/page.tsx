@@ -47,6 +47,69 @@ function Gauge({ score, size = 140, stroke = 12 }: { score: number; size?: numbe
   )
 }
 
+// ─── Radar / Spider chart ─────────────────────────────────────
+function RadarChart({ categories }: { categories: { label: string; score: number; icon: string }[] }) {
+  const size = 220
+  const cx = size / 2
+  const cy = size / 2
+  const r = 80
+  const n = categories.length
+  const levels = [20, 40, 60, 80, 100]
+
+  const angleOf = (i: number) => (Math.PI * 2 * i) / n - Math.PI / 2
+
+  const pointAt = (angle: number, pct: number) => ({
+    x: cx + r * (pct / 100) * Math.cos(angle),
+    y: cy + r * (pct / 100) * Math.sin(angle),
+  })
+
+  const axisPoints = categories.map((_, i) => pointAt(angleOf(i), 100))
+  const dataPoints = categories.map((c, i) => pointAt(angleOf(i), c.score))
+  const toPath = (pts: { x: number; y: number }[]) =>
+    pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ') + 'Z'
+
+  const colorOf = (s: number) => s >= 80 ? '#22c55e' : s >= 60 ? '#eab308' : s >= 40 ? '#f97316' : '#ef4444'
+
+  return (
+    <div className="flex flex-col items-center">
+      <svg width={size} height={size} className="overflow-visible">
+        {/* Grid levels */}
+        {levels.map(l => (
+          <polygon key={l} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1"
+            points={categories.map((_, i) => { const p = pointAt(angleOf(i), l); return `${p.x},${p.y}` }).join(' ')} />
+        ))}
+        {/* Axes */}
+        {axisPoints.map((p, i) => (
+          <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+        ))}
+        {/* Data polygon */}
+        <path d={toPath(dataPoints)} fill="rgba(59,130,246,0.15)" stroke="#3b82f6" strokeWidth="2" />
+        {/* Dots */}
+        {dataPoints.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r={5} fill={colorOf(categories[i].score)} stroke="#0f172a" strokeWidth="2" />
+        ))}
+        {/* Labels */}
+        {categories.map((c, i) => {
+          const angle = angleOf(i)
+          const lp = pointAt(angle, 128)
+          return (
+            <text key={i} x={lp.x} y={lp.y} textAnchor="middle" dominantBaseline="middle"
+              fontSize="11" fill="rgba(255,255,255,0.7)">
+              {c.icon} {c.score}
+            </text>
+          )
+        })}
+      </svg>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 justify-center mt-2">
+        {categories.map(c => (
+          <span key={c.label} className="text-xs text-slate-400">{c.icon} {c.label}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+
 // ─── Score label helper ───────────────────────────────────────
 function scoreInfo(score: number) {
   if (score >= 80) return { label: 'Excelente', color: 'text-green-400', bg: 'bg-green-500/20', border: 'border-green-500/30' }
@@ -268,7 +331,45 @@ export default function PublicReportPage() {
         {/* ── OVERVIEW TAB ── */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            {/* Visual comparison bar */}
+
+            {/* SCREENSHOT + RADAR side by side */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              {/* Screenshot panel */}
+              {audit.report_data?.screenshot ? (
+                <div className="bg-white/5 rounded-2xl border border-white/10 p-4 flex flex-col">
+                  <h2 className="font-bold text-white mb-3 text-sm">📸 Vista actual del sitio</h2>
+                  <div className="relative rounded-xl overflow-hidden border border-white/10 flex-1 min-h-[180px]">
+                    <img
+                      src={audit.report_data.screenshot}
+                      alt={`Captura de ${audit.domain}`}
+                      className="w-full h-full object-cover object-top"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
+                    <div className="absolute bottom-2 left-3 text-xs text-slate-300">
+                      {audit.domain}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white/5 rounded-2xl border border-white/10 p-4 flex flex-col items-center justify-center min-h-[220px]">
+                  <div className="text-4xl mb-2 opacity-30">🌐</div>
+                  <p className="text-slate-500 text-xs">Captura no disponible</p>
+                </div>
+              )}
+
+              {/* Radar chart */}
+              <div className="bg-white/5 rounded-2xl border border-white/10 p-4 flex flex-col items-center">
+                <h2 className="font-bold text-white mb-3 text-sm w-full">🕸️ Radar de salud web</h2>
+                <RadarChart categories={categories.map(c => ({
+                  label: CAT_CONFIG[c.category]?.name || c.category,
+                  score: c.score,
+                  icon: CAT_CONFIG[c.category]?.icon || '📊',
+                }))} />
+              </div>
+            </div>
+
+            {/* Visual comparison bars */}
             <div className="bg-white/5 rounded-2xl border border-white/10 p-6">
               <h2 className="font-bold text-white mb-5">📊 Comparativa por área</h2>
               <div className="space-y-4">
@@ -296,6 +397,7 @@ export default function PublicReportPage() {
                 })}
               </div>
             </div>
+
 
             {/* What does it mean */}
             <div className="bg-white/5 rounded-2xl border border-white/10 p-6">
@@ -356,53 +458,59 @@ export default function PublicReportPage() {
                 <p className="text-slate-400 text-sm">Tu sitio está en excelentes condiciones.</p>
               </div>
             ) : (
-              sortedIssues.map(issue => {
+              sortedIssues.map((issue, idx) => {
                 const s = SEV_CONFIG[issue.severity] || SEV_CONFIG.bajo
                 const catCfg = CAT_CONFIG[issue.category] || { icon: '📋', name: issue.category, tip: '' }
+                const urgencyMsg: Record<string, string> = {
+                  critico: 'Requiere atención inmediata',
+                  alto: 'Resolver en los próximos días',
+                  medio: 'Planificar en las próximas semanas',
+                  bajo: 'Mejorar cuando sea posible',
+                }
                 return (
-                  <div key={issue.id} className={`rounded-2xl border p-5 ${s.bg} ${s.border}`}>
-                    <div className="flex items-start gap-4">
-                      <div className="flex-shrink-0">
-                        <span className="text-2xl">{s.icon}</span>
+                  <div key={issue.id} className={`rounded-2xl border overflow-hidden ${s.border}`}>
+                    {/* Top colored band */}
+                    <div className={`px-5 py-3 flex items-center justify-between ${
+                      issue.severity === 'critico' ? 'bg-red-900/60' :
+                      issue.severity === 'alto'    ? 'bg-orange-900/50' :
+                      issue.severity === 'medio'   ? 'bg-yellow-900/40' : 'bg-blue-900/30'
+                    }`}>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl font-black text-white/30">#{idx + 1}</span>
+                        <span className={`text-xs font-bold px-3 py-1 rounded-full border ${s.bg} ${s.border} ${s.text}`}>
+                          {s.icon} {s.label}
+                        </span>
+                        <span className="text-xs text-slate-400">{catCfg.icon} {catCfg.name}</span>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        {/* Header row */}
-                        <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <Tip text={s.tip}>
-                            <span className={`text-xs font-bold px-2.5 py-1 rounded-full border cursor-help ${s.bg} ${s.border} ${s.text}`}>
-                              {s.label} ⓘ
-                            </span>
-                          </Tip>
-                          <Tip text={catCfg.tip}>
-                            <span className="text-xs text-slate-400 cursor-help">{catCfg.icon} {catCfg.name}</span>
-                          </Tip>
+                      <span className={`text-xs hidden sm:block ${s.text} opacity-70`}>{urgencyMsg[issue.severity]}</span>
+                    </div>
+
+                    {/* Body */}
+                    <div className={`p-5 sm:p-6 ${s.bg}`}>
+                      <h3 className="font-black text-white text-lg sm:text-xl mb-3 leading-snug">{issue.title}</h3>
+
+                      {/* Description — full, non-technical */}
+                      <p className="text-slate-200 text-sm sm:text-base leading-relaxed mb-4">{issue.description}</p>
+
+                      {/* Impact box */}
+                      {issue.impact && (
+                        <div className="mb-4 rounded-xl border border-orange-500/20 bg-orange-950/30 p-4">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-orange-400 text-sm font-bold uppercase tracking-wide">💸 ¿Qué estás perdiendo?</span>
+                          </div>
+                          <p className="text-orange-100 text-sm leading-relaxed">{issue.impact}</p>
                         </div>
+                      )}
 
-                        <h3 className="font-bold text-white text-base mb-1">{issue.title}</h3>
-                        <p className="text-slate-300 text-sm mb-3 leading-relaxed">{issue.description}</p>
-
-                        {/* Impact */}
-                        {issue.impact && (
-                          <div className="mb-3 flex gap-2 items-start">
-                            <span className="text-base flex-shrink-0">📊</span>
-                            <div>
-                              <span className="text-xs font-bold text-slate-400 uppercase tracking-wide block mb-0.5">¿Por qué importa?</span>
-                              <span className="text-sm text-slate-300">{issue.impact}</span>
-                            </div>
+                      {/* Fix box */}
+                      {issue.how_to_fix && (
+                        <div className="rounded-xl border border-emerald-500/20 bg-emerald-950/30 p-4">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-emerald-400 text-sm font-bold uppercase tracking-wide">✅ Cómo solucionarlo</span>
                           </div>
-                        )}
-
-                        {/* Fix */}
-                        {issue.how_to_fix && (
-                          <div className="bg-blue-950/60 border border-blue-500/20 rounded-xl p-3 flex gap-2 items-start">
-                            <span className="text-base flex-shrink-0">🔧</span>
-                            <div>
-                              <span className="text-xs font-bold text-blue-400 uppercase tracking-wide block mb-0.5">Cómo solucionarlo</span>
-                              <span className="text-sm text-blue-200">{issue.how_to_fix}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                          <p className="text-emerald-100 text-sm leading-relaxed">{issue.how_to_fix}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )
