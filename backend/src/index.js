@@ -25,18 +25,33 @@ app.use(compression());
 // Logging
 app.use(morgan('combined'));
 
-// CORS
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'];
+// CORS — always allow production + localhost
+const defaultOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'https://webscan.turbobrandcol.com',
+  'https://scanwebturbo.vercel.app',
+];
+const extraOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : [];
+const allowedOrigins = [...new Set([...defaultOrigins, ...extraOrigins])];
+
 app.use(cors({
   origin: function(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    console.warn(`CORS blocked: ${origin}`);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// Handle preflight requests for all routes
+app.options('*', cors());
 
 // Body parser
 app.use(express.json({ limit: '10mb' }));
