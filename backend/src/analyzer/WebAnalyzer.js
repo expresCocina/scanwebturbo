@@ -124,7 +124,12 @@ class WebAnalyzer {
     });
 
     const startTime = Date.now();
-    await page.goto(this.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    const response = await page.goto(this.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    
+    if (response && response.status() >= 400) {
+      throw new Error(`Bot blocked with status ${response.status()}`);
+    }
+
     const loadTime = Date.now() - startTime;
 
     const metrics = await page.evaluate(() => {
@@ -180,17 +185,21 @@ class WebAnalyzer {
         imgCount,
       }, loadTime);
     } catch (e) {
-      // Si ambos fallan, devolver score parcial con mensaje amigable
+      // Si ambos fallan, verificar si es por bloqueo antibot
+      const isBlocked = e.response && [401, 403, 503].includes(e.response.status);
+      
       return {
-        score: 50,
+        score: isBlocked ? 70 : 50,
         metrics: { fcp: 'No medido', ttfb: 'No medido', fullLoad: 'No medido', totalSize: 'No medido', jsFiles: 0, resources: 0 },
         issues: [{
           category: 'performance',
-          severity: 'medio',
-          title: 'No se pudo medir la velocidad automáticamente',
-          description: 'El sistema no pudo conectarse al sitio para medir su velocidad. Esto puede ocurrir si el sitio tiene protección anti-bots o si está caído temporalmente. La velocidad es un factor clave en Google.',
-          howToFix: 'Puedes medir tu velocidad manualmente en PageSpeed Insights (pagespeed.web.dev). Comparte el resultado con tu desarrollador para priorizar las optimizaciones.',
-          impact: 'Un sitio lento pierde visitas. Google usa la velocidad como factor de posicionamiento — sitios más rápidos aparecen más arriba en los resultados.',
+          severity: isBlocked ? 'medio' : 'alto',
+          title: isBlocked ? 'El sitio bloqueó nuestro escáner (Anti-Bots)' : 'No se pudo medir la velocidad automáticamente',
+          description: isBlocked 
+            ? 'Tu sitio web tiene activada una protección muy estricta contra bots (como Cloudflare o un Firewall). Esto es bueno para la seguridad, pero impide que nuestro sistema pueda medir el tiempo de carga real de tu página.'
+            : 'El sistema no pudo conectarse al sitio para medir su velocidad. Esto puede ocurrir si el sitio tiene protección anti-bots o si está caído temporalmente.',
+          howToFix: 'Puedes medir tu velocidad manualmente de forma gratuita en PageSpeed Insights de Google (pagespeed.web.dev). Comparte el resultado con tu desarrollador.',
+          impact: 'Si el sitio es rápido, no hay impacto. Pero si es lento, pierdes visitas. Google usa la velocidad como factor de posicionamiento — sitios rápidos aparecen más arriba.',
         }],
         recommendations: [],
       };
@@ -289,7 +298,11 @@ class WebAnalyzer {
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       });
       const page = await browser.newPage();
-      await page.goto(this.url, { waitUntil: 'networkidle2', timeout: 30000 });
+      const response = await page.goto(this.url, { waitUntil: 'networkidle2', timeout: 30000 });
+      
+      if (response && response.status() >= 400) {
+        throw new Error(`Bot blocked with status ${response.status()}`);
+      }
 
       const content = await page.content();
       const $ = cheerio.load(content);
@@ -424,16 +437,19 @@ class WebAnalyzer {
       };
 
     } catch (error) {
-      console.error('Error en análisis SEO:', error);
+      console.error('Error en análisis SEO:', error.message);
+      const isBlocked = error.message.includes('status 401') || error.message.includes('status 403') || error.message.includes('status 503');
       return {
-        score: 0,
+        score: isBlocked ? 90 : 0,
         issues: [{
           category: 'seo',
-          severity: 'critico',
-          title: 'Error analizando SEO',
-          description: error.message,
-          howToFix: 'Verifica que el sitio esté accesible',
-          impact: 'No se puede analizar SEO'
+          severity: isBlocked ? 'bajo' : 'critico',
+          title: isBlocked ? 'Sitio protegido por Anti-Bots' : 'Error analizando SEO',
+          description: isBlocked 
+            ? 'Tu sitio tiene un firewall o protección anti-bots (probablemente Cloudflare). Esto bloqueó a nuestro escáner para evitar scraping.' 
+            : error.message,
+          howToFix: isBlocked ? 'Ninguna acción requerida. Asegúrate de que Googlebot sí tenga acceso en la configuración de tu Firewall.' : 'Verifica que el sitio esté accesible',
+          impact: isBlocked ? 'Excelente para la seguridad. Solo verifica en Search Console que Google pueda indexarlo.' : 'No se puede analizar SEO'
         }],
         recommendations: []
       };
@@ -510,16 +526,20 @@ class WebAnalyzer {
       };
 
     } catch (error) {
-      console.error('Error en análisis de seguridad:', error);
+      console.error('Error en análisis de seguridad:', error.message);
+      const isBlocked = error.response && [401, 403, 503].includes(error.response.status);
+      
       return {
-        score: 0,
+        score: isBlocked ? 90 : 0,
         issues: [{
           category: 'security',
-          severity: 'critico',
-          title: 'Error analizando seguridad',
-          description: error.message,
-          howToFix: 'Verifica que el sitio esté accesible',
-          impact: 'No se puede analizar seguridad'
+          severity: isBlocked ? 'bajo' : 'critico',
+          title: isBlocked ? 'Sitio protegido por Anti-Bots (Firewall)' : 'Error analizando seguridad',
+          description: isBlocked 
+            ? 'El sitio tiene un firewall o protección anti-bots activa (como Cloudflare o Sucuri). Esto es una excelente práctica de seguridad, pero impide que nuestro escáner lea los encabezados técnicos.' 
+            : error.message,
+          howToFix: isBlocked ? 'Ninguna acción requerida, tu sitio cuenta con un nivel base de protección.' : 'Verifica que el sitio esté accesible.',
+          impact: isBlocked ? 'Te protege contra ataques automatizados, hackers y tráfico basura.' : 'No se puede analizar seguridad.'
         }],
         recommendations: []
       };
@@ -537,14 +557,19 @@ class WebAnalyzer {
 
     try {
       const browser = await puppeteer.launch({
-        headless: 'new',
-        args: ['--no-sandbox']
+        headless: true,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
       });
 
       // Test mobile
       const page = await browser.newPage();
       await page.setViewport({ width: 375, height: 667 });
-      await page.goto(this.url, { waitUntil: 'networkidle2' });
+      const response = await page.goto(this.url, { waitUntil: 'networkidle2', timeout: 30000 });
+
+      if (response && response.status() >= 400) {
+        throw new Error(`Bot blocked with status ${response.status()}`);
+      }
 
       // Check if mobile-friendly
       const viewport = await page.evaluate(() => {
@@ -590,10 +615,18 @@ class WebAnalyzer {
       };
 
     } catch (error) {
-      console.error('Error en análisis UX:', error);
+      console.error('Error en análisis UX:', error.message);
+      const isBlocked = error.message.includes('status 401') || error.message.includes('status 403') || error.message.includes('status 503');
       return {
-        score: 50,
-        issues: [],
+        score: isBlocked ? 90 : 50,
+        issues: isBlocked ? [{
+          category: 'ux',
+          severity: 'bajo',
+          title: 'Sitio protegido por Anti-Bots',
+          description: 'Tu sitio tiene protección anti-bots (Firewall). Bloqueó nuestra prueba de simulación móvil, por lo que no pudimos verificar la experiencia.',
+          howToFix: 'Verifica manualmente desde tu celular que el sitio se vea bien.',
+          impact: 'Protección activa.'
+        }] : [],
         recommendations: []
       };
     }
