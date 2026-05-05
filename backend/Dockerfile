@@ -29,8 +29,8 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copiar e instalar dependencias (sin descargar Chromium de Puppeteer)
-COPY package*.json ./
+# Copiar e instalar dependencias
+COPY backend/package*.json ./
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
@@ -38,7 +38,7 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 RUN npm install --omit=dev --ignore-scripts
 
 # Copiar código fuente
-COPY src/ ./src/
+COPY backend/src/ ./src/
 
 # Puerto
 EXPOSE 4000
