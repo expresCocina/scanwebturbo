@@ -35,8 +35,17 @@ class WebAnalyzer {
     };
 
     try {
-      // Fetch PageSpeed data once and reuse
-      this._psiCache = await this._fetchPageSpeed('mobile');
+      // Fetch PageSpeed once — never let it crash the whole analysis
+      try {
+        this._psiCache = await this._fetchPageSpeed('mobile');
+      } catch (psiErr) {
+        if (psiErr.response?.status === 429) {
+          this._psiCache = { __rateLimited: true };
+        } else {
+          console.warn('PageSpeed no disponible, usando fallback HTTP:', psiErr.message);
+          this._psiCache = null;
+        }
+      }
 
       // Parallel: screenshot + SEO + security
       const [screenshot, seoData, securityData] = await Promise.all([
@@ -123,10 +132,10 @@ class WebAnalyzer {
         metrics: {},
         issues: [{
           category: 'performance', severity: 'critico',
-          title: 'Límite de Google PageSpeed excedido',
-          description: 'El servidor alcanzó el límite de consultas gratuitas a la API de Google PageSpeed. Configura una API key para continuar.',
-          howToFix: 'Agrega la variable PAGESPEED_API_KEY en tu servidor con tu clave de Google Cloud Console.',
-          impact: 'No se puede medir la velocidad real hasta configurar la clave.'
+          title: 'API de Google PageSpeed no autorizada (error 429/403)',
+          description: 'La clave PAGESPEED_API_KEY está configurada pero Google rechaza las solicitudes. Esto ocurre cuando la API no está habilitada en Google Cloud Console.',
+          howToFix: '1) Ve a console.cloud.google.com → APIs y servicios → Biblioteca. 2) Busca "PageSpeed Insights API" y haz clic en HABILITAR. 3) Asegúrate de que la clave no tenga restricciones de IP o referrer que bloqueen a Railway.',
+          impact: 'Sin esta API no se pueden medir los Core Web Vitals reales. El resto del análisis (SEO, seguridad, UX) sí está funcionando correctamente.'
         }],
         recommendations: []
       };
