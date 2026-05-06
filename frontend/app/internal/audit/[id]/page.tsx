@@ -39,6 +39,7 @@ const CAT_CONFIG: Record<string, { name: string; icon: string; color: string }> 
   security:      { name: 'Seguridad',      icon: '🛡️', color: 'text-green-400' },
   accessibility: { name: 'Accesibilidad',  icon: '♿', color: 'text-yellow-400' },
   ux:            { name: 'Experiencia',    icon: '👁️', color: 'text-pink-400' },
+  conversion:    { name: 'Conversión',     icon: '💰', color: 'text-emerald-400' },
 }
 
 const SEV: Record<string, { label: string; bg: string; border: string; text: string; band: string }> = {
@@ -188,7 +189,7 @@ export default function AuditDetailPage() {
           </div>
 
           {/* Category scores */}
-          <div className="md:col-span-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="md:col-span-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {categories.map(cat => {
               const cfg  = CAT_CONFIG[cat.category] || { name: cat.category, icon: '📊', color: 'text-slate-400' }
               const info = scoreInfo(cat.score)

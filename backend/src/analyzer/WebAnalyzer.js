@@ -67,8 +67,12 @@ class WebAnalyzer {
       results.categories.seo = seoData;
       results.categories.security = securityData;
 
-      const uxData = await this.analyzeUX();
+      const [uxData, conversionData] = await Promise.all([
+        this.analyzeUX(),
+        this.analyzeConversion()
+      ]);
       results.categories.ux = uxData;
+      results.categories.conversion = conversionData;
 
       results.issues = this.collectAllIssues(results.categories);
 
@@ -1121,6 +1125,356 @@ class WebAnalyzer {
           howToFix: 'Prueba el sitio en Google Mobile-Friendly Test (search.google.com/test/mobile-friendly).',
           impact: 'No se pudo verificar la experiencia móvil automáticamente.'
         }] : [],
+        recommendations: []
+      };
+    }
+  }
+
+  // =====================================================
+  // CONVERSION & BUSINESS ANALYSIS
+  // =====================================================
+  async analyzeConversion() {
+    console.log('Analizando Conversión y Negocio...');
+
+    const issues = [];
+    let score = 100;
+
+    let browser, page;
+    try {
+      browser = await puppeteer.launch({
+        headless: true,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+        args: PUPPETEER_ARGS
+      });
+      page = await browser.newPage();
+      await page.setViewport({ width: 1280, height: 800 });
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
+      const res = await page.goto(this.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      if (res && res.status() >= 400) throw new Error(`blocked:${res.status()}`);
+
+      const html = await page.content();
+      const $ = cheerio.load(html);
+      const text = html.toLowerCase();
+
+      // ── WhatsApp button / CTA ──
+      const hasWhatsApp =
+        text.includes('wa.me') ||
+        text.includes('whatsapp.com/send') ||
+        text.includes('api.whatsapp.com') ||
+        text.includes('whatsapp-float') ||
+        /whatsapp/i.test(text) && $('a[href*="wa.me"], a[href*="whatsapp"]').length > 0;
+
+      if (!hasWhatsApp) {
+        issues.push({
+          category: 'conversion', severity: 'alto',
+          title: 'Sin botón de WhatsApp — pierdes el canal de contacto #1 en Latinoamérica',
+          description: 'WhatsApp es el canal de comunicación preferido en Colombia y Latinoamérica. Tu sitio no tiene ningún botón o enlace de WhatsApp visible, lo que dificulta que los clientes te contacten de forma inmediata.',
+          howToFix: 'Agrega un botón flotante de WhatsApp en todas las páginas. Puedes usar plugins gratuitos como "WhatsApp Chat" en WordPress, o generar el enlace: https://wa.me/57TUNUMERO con un texto como "Escríbenos". Colócalo en la esquina inferior derecha.',
+          impact: 'Los sitios con botón WhatsApp visible aumentan los contactos directos entre un 30–50%. En Colombia, el 80% de los compradores prefiere preguntar por WhatsApp antes de comprar.'
+        });
+        score -= 20;
+      }
+
+      // ── Social media presence ──
+      const socialLinks = {
+        facebook:  $('a[href*="facebook.com"]').length > 0 || text.includes('facebook.com/'),
+        instagram: $('a[href*="instagram.com"]').length > 0 || text.includes('instagram.com/'),
+        tiktok:    $('a[href*="tiktok.com"]').length > 0 || text.includes('tiktok.com/'),
+        youtube:   $('a[href*="youtube.com"]').length > 0 || text.includes('youtube.com/'),
+        linkedin:  $('a[href*="linkedin.com"]').length > 0 || text.includes('linkedin.com/'),
+        twitter:   $('a[href*="twitter.com"], a[href*="x.com"]').length > 0,
+      };
+
+      const hasFb  = socialLinks.facebook;
+      const hasIg  = socialLinks.instagram;
+      const hasTt  = socialLinks.tiktok;
+
+      if (!hasFb && !hasIg) {
+        issues.push({
+          category: 'conversion', severity: 'alto',
+          title: 'Sin enlaces a redes sociales — los visitantes no pueden seguirte',
+          description: 'Tu sitio no tiene enlaces visibles a Facebook o Instagram. Las redes sociales son vitales para construir comunidad, generar confianza y mantener el contacto con clientes potenciales.',
+          howToFix: 'Agrega íconos de redes sociales en el header o footer de tu sitio que enlacen a tus perfiles. Son 5 minutos de trabajo para tu desarrollador.',
+          impact: 'Sin redes sociales visibles, los visitantes no pueden verificar que tu negocio es real y activo. Genera desconfianza y reduce las conversiones.'
+        });
+        score -= 15;
+      } else if (!hasTt && (hasFb || hasIg)) {
+        issues.push({
+          category: 'conversion', severity: 'medio',
+          title: 'Sin presencia en TikTok — la red de mayor crecimiento orgánico',
+          description: 'Tu sitio tiene Facebook o Instagram pero no TikTok. TikTok es actualmente la plataforma con mayor alcance orgánico gratuito, especialmente para negocios que venden a menores de 40 años.',
+          howToFix: 'Crea un perfil en TikTok y agrega el enlace al footer de tu sitio. Con 3-5 videos semanales de 30 segundos puedes alcanzar miles de personas sin pagar publicidad.',
+          impact: 'TikTok genera 3x más alcance orgánico que Facebook e Instagram actualmente. Es la oportunidad de marketing más rentable para negocios pequeños y medianos.'
+        });
+        score -= 8;
+      }
+
+      // ── Phone number ──
+      const hasPhone =
+        $('a[href^="tel:"]').length > 0 ||
+        /\+57[\s\-]?[0-9]{10}|3[0-9]{9}|\(60[1-9]\)[\s\-]?[0-9]{7}/g.test(text);
+
+      if (!hasPhone) {
+        issues.push({
+          category: 'conversion', severity: 'alto',
+          title: 'Sin número de teléfono visible — los clientes no pueden llamarte',
+          description: 'Tu sitio no tiene un número de teléfono visible o con enlace "tel:". Muchos clientes, especialmente mayores de 40 años, prefieren llamar antes de comprar.',
+          howToFix: 'Agrega tu número de teléfono en el header y en el pie de página. Usa el formato <a href="tel:+573001234567">+57 300 123 4567</a> para que sea tappable en móviles.',
+          impact: 'Un teléfono visible aumenta la confianza y puede incrementar conversiones entre un 10–25%, especialmente en servicios de alto valor.'
+        });
+        score -= 12;
+      }
+
+      // ── Email / contact ──
+      const hasEmail =
+        $('a[href^="mailto:"]').length > 0 ||
+        /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i.test(text);
+
+      if (!hasEmail) {
+        issues.push({
+          category: 'conversion', severity: 'medio',
+          title: 'Sin dirección de email visible',
+          description: 'Tu sitio no muestra una dirección de correo electrónico. Algunos clientes prefieren el email para consultas formales o cotizaciones.',
+          howToFix: 'Agrega tu email de contacto en el footer o página de contacto con un enlace mailto:. Considera también agregar un formulario de contacto si no tienes uno.',
+          impact: 'Un email visible da credibilidad y ofrece una vía de contacto alternativa a quienes no usan WhatsApp.'
+        });
+        score -= 5;
+      }
+
+      // ── Payment methods (LatAm focus) ──
+      const payments = {
+        pse:         text.includes('pse') || text.includes('pagos seguros en línea'),
+        nequi:       text.includes('nequi'),
+        daviplata:   text.includes('daviplata'),
+        mercadopago: text.includes('mercadopago') || text.includes('mercado pago'),
+        paypal:      text.includes('paypal'),
+        payu:        text.includes('payu') || text.includes('pay u'),
+        wompi:       text.includes('wompi'),
+        stripe:      text.includes('stripe'),
+        contraentrega: text.includes('contra entrega') || text.includes('contraentrega') || text.includes('pago contra'),
+      };
+      const hasAnyPayment = Object.values(payments).some(Boolean);
+      const hasLocalPayment = payments.pse || payments.nequi || payments.daviplata || payments.wompi || payments.mercadopago;
+      const isEcommerce = text.includes('carrito') || text.includes('cart') || text.includes('comprar') || text.includes('tienda') || text.includes('shop') || $('[class*="cart"], [class*="shop"], [id*="cart"]').length > 0;
+
+      if (isEcommerce && !hasAnyPayment) {
+        issues.push({
+          category: 'conversion', severity: 'critico',
+          title: 'Tienda sin métodos de pago detectables',
+          description: 'Tu sitio parece ser una tienda en línea pero no se detectan métodos de pago configurados o visibles. Los clientes no pueden ver cómo pagar.',
+          howToFix: 'Integra al menos 2-3 métodos de pago. Para Colombia: PSE + Nequi + Daviplata son esenciales. También considera Wompi o PayU como pasarela principal. Muestra los logos de los métodos de pago en el checkout y en el footer.',
+          impact: 'Sin métodos de pago claros, los clientes no pueden comprar. El 67% de los colombianos abandona el carrito si no encuentra su método de pago preferido.'
+        });
+        score -= 30;
+      } else if (isEcommerce && !hasLocalPayment) {
+        issues.push({
+          category: 'conversion', severity: 'alto',
+          title: 'Sin métodos de pago locales (PSE, Nequi, Daviplata)',
+          description: 'Tu tienda no muestra métodos de pago populares en Colombia. PSE es el método de pago online más usado, seguido por Nequi y Daviplata con millones de usuarios activos.',
+          howToFix: 'Integra PSE a través de Wompi, PayU o Evertec. Para Nequi y Daviplata, habla con tu banco o usa Wompi que los soporta todos. El proceso toma 1-2 semanas de aprobación.',
+          impact: 'Ofrecer PSE, Nequi y Daviplata puede aumentar las ventas completadas entre un 20–40% al eliminar fricción en el pago.'
+        });
+        score -= 15;
+      }
+
+      // ── Reviews / testimonials ──
+      const hasReviews =
+        text.includes('judge.me') ||
+        text.includes('trustpilot') ||
+        text.includes('yotpo') ||
+        text.includes('opiniones') ||
+        text.includes('reseñas') ||
+        text.includes('testimonios') ||
+        $('[class*="review"], [class*="testimonial"], [class*="rating"], [itemprop="review"]').length > 0 ||
+        $('script[src*="judge.me"], script[src*="trustpilot"], script[src*="yotpo"]').length > 0;
+
+      if (!hasReviews) {
+        issues.push({
+          category: 'conversion', severity: 'alto',
+          title: 'Sin sección de reseñas o testimonios',
+          description: 'Tu sitio no muestra reseñas, testimonios de clientes ni valoraciones. El 93% de los consumidores lee reseñas antes de comprar o contratar un servicio.',
+          howToFix: 'Si tienes Shopify, instala Judge.me (gratuito) o Loox. Si tienes WordPress, usa WP Customer Reviews. Si es un sitio a medida, agrega una sección de testimonios con foto y nombre del cliente. También activa las reseñas de Google My Business.',
+          impact: 'Agregar reseñas puede aumentar la tasa de conversión entre un 15–40%. Los clientes nuevos confían más cuando ven que otros han tenido buenas experiencias.'
+        });
+        score -= 12;
+      }
+
+      // ── Newsletter / Lead capture ──
+      const hasNewsletter =
+        $('input[type="email"]').length > 0 ||
+        text.includes('newsletter') ||
+        text.includes('suscríb') ||
+        text.includes('suscribete') ||
+        text.includes('subscribe') ||
+        text.includes('mailchimp') ||
+        text.includes('klaviyo') ||
+        text.includes('activecampaign');
+
+      if (!hasNewsletter) {
+        issues.push({
+          category: 'conversion', severity: 'medio',
+          title: 'Sin formulario de captura de emails (newsletter)',
+          description: 'Tu sitio no tiene ningún mecanismo para capturar emails de visitantes interesados. El email marketing sigue siendo el canal con mayor retorno de inversión: $42 por cada $1 invertido.',
+          howToFix: 'Agrega un formulario de suscripción con un incentivo claro: "Suscríbete y recibe 10% de descuento en tu primera compra" o "Descarga gratis nuestra guía de...". Usa Mailchimp (gratuito hasta 500 contactos) o Klaviyo para e-commerce.',
+          impact: 'Capturar emails permite recuperar visitantes que no compraron hoy. Con una lista de 1.000 suscriptores activos, puedes generar ventas consistentes con solo 1 email a la semana.'
+        });
+        score -= 8;
+      }
+
+      // ── Live chat / support ──
+      const hasChat =
+        text.includes('tawk.to') ||
+        text.includes('tidio') ||
+        text.includes('crisp.chat') ||
+        text.includes('intercom') ||
+        text.includes('zendesk') ||
+        text.includes('livechat') ||
+        text.includes('hubspot') ||
+        $('script[src*="tawk"], script[src*="tidio"], script[src*="crisp"], script[src*="intercom"]').length > 0;
+
+      if (!hasWhatsApp && !hasChat) {
+        issues.push({
+          category: 'conversion', severity: 'medio',
+          title: 'Sin chat en tiempo real — los visitantes no pueden resolver dudas al instante',
+          description: 'Tu sitio no tiene WhatsApp ni ningún chat en vivo. Los visitantes que tienen dudas se van sin preguntar. Un chat accesible puede resolver objeciones en el momento crítico de la decisión de compra.',
+          howToFix: 'Instala Tawk.to (completamente gratuito), Tidio o simplemente agrega un botón de WhatsApp flotante. Tawk.to tiene app móvil para responder desde el celular.',
+          impact: 'Los sitios con chat en vivo tienen tasas de conversión hasta 3x más altas que los que no tienen. El 79% de los consumidores prefiere el chat para preguntas rápidas.'
+        });
+        score -= 8;
+      }
+
+      // ── FAQ page ──
+      const hasFAQ =
+        $('a[href*="faq"], a[href*="preguntas"], a[href*="ayuda"]').length > 0 ||
+        text.includes('"@type":"faqpage"') ||
+        text.includes('"@type": "faqpage"') ||
+        $('[itemtype*="FAQPage"]').length > 0 ||
+        text.includes('preguntas frecuentes') ||
+        text.includes('faq');
+
+      if (!hasFAQ) {
+        issues.push({
+          category: 'conversion', severity: 'bajo',
+          title: 'Sin página de preguntas frecuentes (FAQ)',
+          description: 'Tu sitio no tiene una sección de preguntas frecuentes. Las FAQ reducen las dudas que impiden la compra y mejoran el SEO al responder preguntas que la gente busca en Google.',
+          howToFix: 'Crea una página de preguntas frecuentes con las 8-10 preguntas más comunes que te hacen los clientes. Usa Schema FAQPage para que aparezcan directamente en Google (ocupa más espacio en resultados de búsqueda).',
+          impact: 'Una buena FAQ puede reducir los mensajes repetitivos un 30% y mejorar tu visibilidad en Google con los rich snippets de preguntas y respuestas.'
+        });
+        score -= 5;
+      }
+
+      // ── Cookie banner / Privacy ──
+      const hasCookie =
+        text.includes('cookie') ||
+        text.includes('cookieyes') ||
+        text.includes('cookiebot') ||
+        text.includes('complianz') ||
+        $('[class*="cookie"], [id*="cookie"]').length > 0;
+
+      if (!hasCookie) {
+        issues.push({
+          category: 'conversion', severity: 'bajo',
+          title: 'Sin banner de cookies ni política de privacidad visible',
+          description: 'Tu sitio no muestra un aviso de cookies. La Ley 1581 de Colombia exige informar a los usuarios sobre el tratamiento de sus datos personales. La ausencia puede generar problemas legales.',
+          howToFix: 'Instala un plugin de cookies (CookieYes es gratuito para WordPress y Shopify). Crea también una página de Política de Privacidad y Términos y Condiciones visibles en el footer.',
+          impact: 'El cumplimiento de protección de datos genera confianza y evita sanciones de la SIC (Superintendencia de Industria y Comercio).'
+        });
+        score -= 5;
+      }
+
+      // ── Google Maps / Physical location ──
+      const hasMap =
+        text.includes('maps.google') ||
+        text.includes('google.com/maps') ||
+        text.includes('maps.googleapis') ||
+        $('iframe[src*="google.com/maps"], iframe[src*="maps.google"]').length > 0;
+
+      const hasAddress =
+        text.includes('dirección') ||
+        text.includes('address') ||
+        $('[itemprop="streetAddress"], [itemprop="address"]').length > 0 ||
+        /calle|carrera|avenida|cra\.|cl\.|av\./i.test(text);
+
+      const isLocalBusiness = text.includes('contacto') || text.includes('ubícanos') || text.includes('encuéntranos');
+
+      if (isLocalBusiness && !hasMap && !hasAddress) {
+        issues.push({
+          category: 'conversion', severity: 'medio',
+          title: 'Sin mapa o dirección física visible',
+          description: 'Tu sitio parece ser un negocio local pero no muestra un mapa de Google ni una dirección física. Esto genera desconfianza en clientes que quieren saber dónde estás ubicado.',
+          howToFix: 'Agrega un iframe de Google Maps con tu ubicación y muestra tu dirección completa en la página de contacto y en el footer. Esto también mejora tu SEO local.',
+          impact: 'Los negocios locales con dirección y mapa visible reciben un 42% más de solicitudes de "cómo llegar" desde Google y generan más confianza en los clientes.'
+        });
+        score -= 8;
+      }
+
+      // ── Schema markup for business ──
+      const schemaScripts = $('script[type="application/ld+json"]');
+      let hasLocalBusinessSchema = false;
+      let hasProductSchema = false;
+      let hasFAQSchema = false;
+      let hasOrganizationSchema = false;
+
+      schemaScripts.each((_, el) => {
+        try {
+          const data = JSON.parse($(el).html() || '{}');
+          const types = [].concat(data['@type'] || [], (data['@graph'] || []).map((i) => i['@type'])).join(',').toLowerCase();
+          if (types.includes('localbusiness') || types.includes('store') || types.includes('restaurant')) hasLocalBusinessSchema = true;
+          if (types.includes('product') || types.includes('offer')) hasProductSchema = true;
+          if (types.includes('faqpage')) hasFAQSchema = true;
+          if (types.includes('organization') || types.includes('corporation')) hasOrganizationSchema = true;
+        } catch (_) {}
+      });
+
+      if (isEcommerce && !hasProductSchema) {
+        issues.push({
+          category: 'conversion', severity: 'medio',
+          title: 'Sin Schema de Producto — tus productos no muestran precio/rating en Google',
+          description: 'Tu tienda no tiene marcado Schema.org para productos. Sin él, Google no puede mostrar el precio, disponibilidad y calificación de tus productos directamente en los resultados de búsqueda (rich snippets).',
+          howToFix: 'En Shopify, el Schema de producto se activa automáticamente con temas pagos. En WordPress con WooCommerce, usa el plugin "Schema Pro" o actívalo en Yoast. Incluye: nombre, precio, disponibilidad, imagen y reseñas.',
+          impact: 'Los rich snippets de productos (con precio y estrellas) aumentan el CTR desde Google entre un 20–35% comparado con resultados sin schema.'
+        });
+        score -= 10;
+      }
+
+      if (!hasFAQSchema && text.includes('pregunta') || !hasFAQSchema && text.includes('faq')) {
+        issues.push({
+          category: 'conversion', severity: 'bajo',
+          title: 'Sin Schema FAQPage — tus preguntas frecuentes no aparecen en Google',
+          description: 'Tu sitio parece tener una sección de preguntas frecuentes pero no tiene el marcado Schema FAQPage. Google puede mostrar estas preguntas directamente en los resultados de búsqueda como "rich snippets".',
+          howToFix: 'Agrega un bloque JSON-LD con @type: FAQPage que liste tus preguntas y respuestas. Esto es especialmente fácil en WordPress con el plugin Yoast o RankMath.',
+          impact: 'Los rich snippets de FAQ duplican el espacio visual de tu resultado en Google y aumentan el CTR entre un 20–30%.'
+        });
+        score -= 3;
+      }
+
+      if (!hasOrganizationSchema && !hasLocalBusinessSchema) {
+        issues.push({
+          category: 'conversion', severity: 'medio',
+          title: 'Sin Schema de Organización/Negocio',
+          description: 'Tu sitio no tiene datos estructurados que identifiquen tu empresa en Google. El Schema Organization le dice a Google tu nombre de negocio, logo, redes sociales y sitio web oficiales.',
+          howToFix: 'Agrega un bloque JSON-LD en el <head> de tu sitio con tu Schema Organization. Incluye: name, url, logo, sameAs (tus redes sociales), contactPoint (teléfono y email).',
+          impact: 'Un Schema Organization correcto puede generar un "Knowledge Panel" en Google con tu logo y datos de la empresa, aumentando enormemente la visibilidad de tu marca.'
+        });
+        score -= 8;
+      }
+
+      await browser.close();
+
+      return { score: Math.max(0, Math.min(100, score)), issues, recommendations: [] };
+
+    } catch (error) {
+      if (browser) { try { await browser.close(); } catch (_) {} }
+      const isBlocked = error.message?.includes('blocked:');
+      return {
+        score: isBlocked ? 70 : 50,
+        issues: isBlocked ? [] : [{
+          category: 'conversion', severity: 'medio',
+          title: 'No se pudo analizar el potencial de conversión',
+          description: `No se pudo cargar la página para análisis de conversión: ${error.message}`,
+          howToFix: 'Verifica que el sitio esté accesible públicamente.',
+          impact: 'No se pudieron verificar los elementos de conversión y negocio.'
+        }],
         recommendations: []
       };
     }

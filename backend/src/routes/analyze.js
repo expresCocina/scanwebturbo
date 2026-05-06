@@ -137,11 +137,12 @@ async function performAnalysis(auditId, domain, analysisType) {
 // =====================================================
 function calculateGlobalScore(categories) {
   const weights = {
-    performance:   0.30,
-    seo:           0.25,
-    security:      0.20,
-    accessibility: 0.15,
-    ux:            0.10,
+    performance:   0.25,
+    seo:           0.22,
+    security:      0.18,
+    accessibility: 0.13,
+    ux:            0.12,
+    conversion:    0.10,
   };
   let total = 0, weightSum = 0;
   for (const [name, data] of Object.entries(categories)) {

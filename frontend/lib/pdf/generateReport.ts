@@ -28,6 +28,7 @@ const CAT_NAMES: Record<string, string> = {
   security:      'Seguridad',
   accessibility: 'Accesibilidad',
   ux:            'Experiencia',
+  conversion:    'Conversión',
 }
 
 const SEV_LABELS: Record<string, string> = {

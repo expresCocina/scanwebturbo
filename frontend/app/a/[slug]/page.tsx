@@ -145,6 +145,11 @@ const CAT_CONFIG: Record<string, { name: string; icon: string; tip: string }> = 
     icon: '👁️',
     tip: 'Mide qué tan cómodo y fácil es navegar tu sitio, especialmente desde el celular. Una mala experiencia hace que los visitantes no vuelvan.',
   },
+  conversion: {
+    name: 'Conversión',
+    icon: '💰',
+    tip: 'Evalúa los elementos que convierten visitantes en clientes: WhatsApp, redes sociales, métodos de pago, reseñas, chat en vivo y datos estructurados para Google.',
+  },
 }
 
 const SEV_CONFIG: Record<string, { icon: string; label: string; bg: string; border: string; text: string; tip: string }> = {
@@ -288,7 +293,7 @@ export default function PublicReportPage() {
         </div>
 
         {/* ── CATEGORY CARDS ── */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-10">
           {categories.map(cat => {
             const cfg = CAT_CONFIG[cat.category] || { name: cat.category, icon: '📊', tip: '' }
             const info = scoreInfo(cat.score)
