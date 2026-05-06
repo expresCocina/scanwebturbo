@@ -598,7 +598,7 @@ export default function PublicReportPage() {
               Agendar llamada gratis →
             </button>
             <button
-              onClick={() => window.open('https://turbobrandcol.com', '_blank')}
+              onClick={() => window.open('https://www.turbobrandcol.com/', '_blank')}
               className="w-full sm:w-auto px-6 sm:px-8 py-3 bg-white/10 border border-white/30 text-white font-medium rounded-xl sm:rounded-2xl hover:bg-white/20 transition-all text-sm sm:text-base"
             >
               Conocer TurboBrand
