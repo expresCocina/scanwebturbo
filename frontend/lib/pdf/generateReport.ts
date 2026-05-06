@@ -23,10 +23,11 @@ interface Issue {
 }
 
 const CAT_NAMES: Record<string, string> = {
-  performance: 'Velocidad',
-  seo: 'SEO',
-  security: 'Seguridad',
-  ux: 'Experiencia de Usuario',
+  performance:   'Velocidad',
+  seo:           'SEO',
+  security:      'Seguridad',
+  accessibility: 'Accesibilidad',
+  ux:            'Experiencia',
 }
 
 const SEV_LABELS: Record<string, string> = {
@@ -183,9 +184,10 @@ export async function generateAuditPDF(
   doc.setTextColor(sr, sg, sb)
   doc.text(scoreLabel(audit.score_global), circleX, circleY + 26, { align: 'center' })
 
-  // Category summary row
+  // Category summary row (dynamic width based on number of categories)
   const catY = 215
-  const catW = contentW / 4
+  const catCount = Math.max(categories.length, 1)
+  const catW = contentW / catCount
   categories.forEach((cat, i) => {
     const cx = margin + catW * i + catW / 2
     const [cr, cg, cb] = scoreRGB(cat.score)

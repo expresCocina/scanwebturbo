@@ -2,101 +2,104 @@ const Anthropic = require('@anthropic-ai/sdk');
 
 class AIProcessor {
   constructor() {
-    this.client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY
-    });
+    this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   }
 
   async process(domain, analysisResults) {
     console.log('Procesando con IA...');
-
     try {
-      // Preparar contexto para Claude
       const context = this.buildContext(domain, analysisResults);
-
-      // Llamar a Claude API
       const message = await this.client.messages.create({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 2000,
-        messages: [{
-          role: 'user',
-          content: context
-        }]
+        model: 'claude-sonnet-4-6',
+        max_tokens: 3000,
+        messages: [{ role: 'user', content: context }]
       });
 
-      // Parsear respuesta — Claude a veces envuelve en ```json ... ```
-      let rawText = message.content[0].text.trim();
-      // Eliminar bloques de código markdown si existen
-      rawText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-      const aiResponse = JSON.parse(rawText);
+      let raw = message.content[0].text.trim();
+      raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+      const parsed = JSON.parse(raw);
 
       return {
-        recommendations: aiResponse.recommendations || [],
-        summary: aiResponse.summary || '',
-        priorityActions: aiResponse.priorityActions || []
+        recommendations: parsed.recommendations || [],
+        summary: parsed.summary || '',
+        priorityActions: parsed.priorityActions || []
       };
-
     } catch (error) {
       console.error('Error en procesamiento IA:', error);
-      return {
-        recommendations: [],
-        summary: 'No se pudo generar análisis con IA',
-        priorityActions: []
-      };
+      return { recommendations: [], summary: 'No se pudo generar análisis con IA.', priorityActions: [] };
     }
   }
 
   buildContext(domain, results) {
-    const issuesByCategory = {};
-    
-    for (const issue of results.issues || []) {
-      if (!issuesByCategory[issue.category]) {
-        issuesByCategory[issue.category] = [];
-      }
-      issuesByCategory[issue.category].push(issue);
-    }
+    const cats = results.categories || {};
+    const issues = results.issues || [];
 
-    return `Eres un experto en auditorías web. Analiza los siguientes resultados de la auditoría del sitio ${domain} y genera recomendaciones priorizadas.
+    const criticalIssues = issues.filter(i => i.severity === 'critico');
+    const highIssues     = issues.filter(i => i.severity === 'alto');
 
-RESULTADOS DEL ANÁLISIS:
+    const scoreBlock = Object.entries(cats)
+      .map(([name, data]) => `- ${name}: ${data.score}/100`)
+      .join('\n');
 
-Scores por categoría:
-- Performance: ${results.categories.performance?.score || 0}/100
-- SEO: ${results.categories.seo?.score || 0}/100  
-- Seguridad: ${results.categories.security?.score || 0}/100
-- UX: ${results.categories.ux?.score || 0}/100
+    const issueBlock = issues.slice(0, 20).map(i =>
+      `[${i.severity.toUpperCase()}][${i.category}] ${i.title}`
+    ).join('\n');
 
-Issues detectados:
-${JSON.stringify(issuesByCategory, null, 2)}
+    const metricsBlock = (() => {
+      const m = cats.performance?.metrics;
+      if (!m) return 'No disponible';
+      return [
+        m.fcp    !== undefined ? `FCP: ${(m.fcp/1000).toFixed(1)}s`         : '',
+        m.lcp    !== undefined ? `LCP: ${(m.lcp/1000).toFixed(1)}s`         : '',
+        m.tbt    !== undefined ? `TBT: ${m.tbt}ms`                           : '',
+        m.cls    !== undefined ? `CLS: ${m.cls}`                             : '',
+        m.speedIndex !== undefined ? `Speed Index: ${(m.speedIndex/1000).toFixed(1)}s` : '',
+        m.ttfb   !== undefined ? `TTFB: ${m.ttfb}ms`                         : '',
+        m.totalTransferKB ? `Peso total: ${m.totalTransferKB}KB`             : '',
+      ].filter(Boolean).join(' | ');
+    })();
+
+    return `Eres un experto senior en optimización web, SEO y conversión digital. Analiza la siguiente auditoría del sitio web "${domain}" y genera recomendaciones priorizadas, concretas y accionables.
+
+SCORES POR CATEGORÍA:
+${scoreBlock}
+
+MÉTRICAS DE PERFORMANCE (Core Web Vitals):
+${metricsBlock}
+
+PROBLEMAS DETECTADOS (${issues.length} total — ${criticalIssues.length} críticos, ${highIssues.length} importantes):
+${issueBlock}
 
 INSTRUCCIONES:
-Genera un JSON con la siguiente estructura (responde SOLO con JSON válido, sin texto adicional):
+Responde ÚNICAMENTE con JSON válido (sin texto adicional, sin markdown). Estructura exacta:
 
 {
-  "summary": "Resumen ejecutivo de 2-3 oraciones sobre el estado general del sitio",
+  "summary": "Resumen ejecutivo de 2-3 oraciones. Menciona el estado general, los 2 problemas más críticos y el impacto en el negocio. Usa lenguaje directo y sin tecnicismos.",
   "priorityActions": [
-    "Acción 1 más importante",
-    "Acción 2",
-    "Acción 3"
+    "Acción concreta #1 con métrica de impacto esperado",
+    "Acción concreta #2 con métrica de impacto esperado",
+    "Acción concreta #3 con métrica de impacto esperado"
   ],
   "recommendations": [
     {
       "priority": 1,
-      "title": "Título corto",
-      "description": "Explicación clara de qué hacer y por qué",
-      "expectedImpact": "Qué mejorará específicamente",
+      "title": "Título corto y accionable (máx 60 chars)",
+      "description": "Explicación de qué hacer, cómo y por qué. Incluye pasos concretos. Máx 3 oraciones.",
+      "expectedImpact": "Impacto cuantificado cuando sea posible (ej: +30% velocidad, -15% tasa rebote)",
       "effortLevel": "bajo|medio|alto",
-      "category": "performance|seo|security|ux"
+      "category": "performance|seo|security|accessibility|ux",
+      "timeToFix": "estimación de tiempo (ej: 30 minutos, 1 día, 1 semana)"
     }
   ]
 }
 
-IMPORTANTE:
-- Ordena recommendations por impacto vs esfuerzo (quick wins primero)
-- Usa lenguaje simple, sin tecnicismos excesivos
-- Sé específico en las acciones
-- Máximo 8 recomendaciones
-- expectedImpact debe ser cuantificable cuando sea posible (ej: "+20% velocidad")`;
+CRITERIOS:
+- Ordena por impacto/esfuerzo (quick wins primero)
+- Máximo 10 recomendaciones
+- Si el score de performance es < 50, prioriza los Core Web Vitals
+- Si hay problemas críticos de seguridad, ponlos en el top 3
+- Si no hay problemas de una categoría, no la incluyas a la fuerza
+- expectedImpact debe ser específico y realista, no genérico`;
   }
 }
 

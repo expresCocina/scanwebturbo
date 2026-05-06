@@ -30,7 +30,7 @@ export type Audit = {
 export type AuditCategory = {
   id: string
   audit_id: string
-  category: 'performance' | 'seo' | 'security' | 'ux'
+  category: 'performance' | 'seo' | 'security' | 'accessibility' | 'ux'
   score: number
   issues: any[]
   recommendations: any[]

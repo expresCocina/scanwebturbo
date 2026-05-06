@@ -224,11 +224,12 @@ export default function NewAuditPage() {
           <h3 className="font-bold text-white mb-4 text-sm sm:text-base">🔍 ¿Qué analizamos?</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
-              { icon: '⚡', title: 'Velocidad', desc: 'FCP, TTFB, carga total, peso de la página' },
-              { icon: '📈', title: 'SEO Técnico', desc: 'Meta tags, estructura, indexabilidad' },
-              { icon: '🛡️', title: 'Seguridad', desc: 'SSL, headers de seguridad, vulnerabilidades' },
-              { icon: '👁️', title: 'Experiencia', desc: 'Responsive, accesibilidad, mobile-first' },
-              { icon: '📋', title: 'Recomendaciones', desc: 'Plan de mejoras priorizado con pasos concretos', span: 'sm:col-span-2' },
+              { icon: '⚡', title: 'Velocidad (Core Web Vitals)', desc: 'FCP, LCP, TBT, CLS, Speed Index, TTFB — métricas reales de Google PageSpeed' },
+              { icon: '📈', title: 'SEO Técnico', desc: 'Títulos, meta tags, canonical, Schema.org, sitemap, Open Graph, alt de imágenes' },
+              { icon: '🛡️', title: 'Seguridad', desc: 'SSL, HSTS, CSP, X-Frame-Options, rutas expuestas, contenido mixto' },
+              { icon: '♿', title: 'Accesibilidad WCAG', desc: 'Contraste, alt texts, etiquetas de formulario, navegación con teclado' },
+              { icon: '👁️', title: 'Experiencia Móvil', desc: 'Responsive, touch targets, fuentes legibles, scroll horizontal, imágenes rotas' },
+              { icon: '🤖', title: 'Recomendaciones IA', desc: 'Plan de mejoras priorizado por impacto/esfuerzo con pasos concretos' },
             ].map(item => (
               <div key={item.title} className={`flex items-start gap-3 p-3 rounded-xl bg-white/[0.03] ${(item as any).span || ''}`}>
                 <span className="text-xl flex-shrink-0">{item.icon}</span>

@@ -135,6 +135,11 @@ const CAT_CONFIG: Record<string, { name: string; icon: string; tip: string }> = 
     icon: '🛡️',
     tip: 'Evalúa si tu sitio protege correctamente la información de tus visitantes. Un sitio inseguro puede ser hackeado o marcado como peligroso por los navegadores.',
   },
+  accessibility: {
+    name: 'Accesibilidad',
+    icon: '♿',
+    tip: 'Mide si todas las personas, incluyendo quienes tienen discapacidades visuales o motoras, pueden usar tu sitio correctamente. Google premia los sitios accesibles.',
+  },
   ux: {
     name: 'Experiencia',
     icon: '👁️',
